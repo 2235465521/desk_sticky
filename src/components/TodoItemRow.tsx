@@ -12,6 +12,7 @@ interface TodoItemRowProps {
   onCancelEdit: () => void;
   onToggleComplete: (id: string) => void;
   onDelete: (id: string) => void;
+  tabbable?: boolean;
 }
 
 export const TodoItemRow = memo(function TodoItemRow({
@@ -23,6 +24,7 @@ export const TodoItemRow = memo(function TodoItemRow({
   onCancelEdit,
   onToggleComplete,
   onDelete,
+  tabbable = true,
 }: TodoItemRowProps) {
   const [draft, setDraft] = useState(item.content);
   const [celebrating, setCelebrating] = useState(false);
@@ -89,14 +91,15 @@ export const TodoItemRow = memo(function TodoItemRow({
   };
 
   const handleCheckClick = () => {
-    if (!item.completed) {
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!item.completed && !reduceMotion) {
       setCelebrating(true);
       if (celebrateTimerRef.current) {
         window.clearTimeout(celebrateTimerRef.current);
       }
       celebrateTimerRef.current = window.setTimeout(() => {
         setCelebrating(false);
-      }, 700);
+      }, 1050);
     }
     onToggleComplete(item.id);
   };
@@ -109,6 +112,7 @@ export const TodoItemRow = memo(function TodoItemRow({
 
   return (
     <div
+      data-todo-id={item.id}
       className={`todo-card-border-wrap group relative ${
         isEditing ? "todo-card-editing" : ""
       }`}
@@ -132,19 +136,18 @@ export const TodoItemRow = memo(function TodoItemRow({
                 isComposingRef.current = false;
               }}
               onKeyDown={handleEditKeyDown}
+              tabIndex={tabbable ? undefined : -1}
               className="body-5 w-full resize-none bg-transparent outline-none select-text whitespace-pre-wrap break-words"
               style={{ color: "var(--text-primary)" }}
             />
           ) : (
             <div
               onDoubleClick={() => onStartEdit(item.id, segmentKey)}
-              className="whitespace-pre-wrap break-words cursor-text select-text"
+              className="whitespace-pre-wrap break-words cursor-text select-text body-5"
               style={{
-                fontFamily: '"SimHei", "Microsoft YaHei UI", "Heiti SC", sans-serif',
-                fontSize: "15px",
-                lineHeight: "22px",
-                fontWeight: 700,
                 color: item.completed ? "var(--text-completed)" : "var(--text-primary)",
+                textDecoration: item.completed ? "line-through" : "none",
+                opacity: item.completed ? 0.78 : 1,
               }}
             >
               {item.content}
@@ -160,6 +163,7 @@ export const TodoItemRow = memo(function TodoItemRow({
                 onClick={() => onStartEdit(item.id, segmentKey)}
                 title="编辑"
                 aria-label="编辑事项"
+                tabIndex={tabbable ? undefined : -1}
                 className="interactive-btn w-5 h-5 rounded flex items-center justify-center hover:bg-[var(--action-secondary)]"
                 style={{ color: "var(--icon-secondary)" }}
               >
@@ -170,6 +174,7 @@ export const TodoItemRow = memo(function TodoItemRow({
                 onClick={() => onDelete(item.id)}
                 title="删除"
                 aria-label="删除事项"
+                tabIndex={tabbable ? undefined : -1}
                 className="interactive-btn w-5 h-5 rounded flex items-center justify-center hover:bg-[var(--action-danger-hover)]"
                 style={{ color: "var(--icon-error)" }}
               >
@@ -184,12 +189,11 @@ export const TodoItemRow = memo(function TodoItemRow({
                 onClick={handleCheckClick}
                 title={item.completed ? "取消完成" : "标记完成"}
                 aria-label={item.completed ? "取消完成" : "标记完成"}
-                className="interactive-btn w-4 h-4 rounded flex items-center justify-center shrink-0 border"
+                tabIndex={tabbable ? undefined : -1}
+                className="interactive-btn w-4 h-4 rounded-full flex items-center justify-center shrink-0 border"
                 style={{
-                  borderColor: item.completed ? "var(--action-primary)" : "#3b82f6",
-                  backgroundColor: item.completed
-                    ? "var(--action-primary)"
-                    : "rgba(255, 255, 255, 0.72)",
+                  borderColor: item.completed ? "var(--action-primary)" : "var(--border-primary)",
+                  backgroundColor: item.completed ? "var(--action-primary)" : "transparent",
                   color: "var(--text-inverted)",
                 }}
               >

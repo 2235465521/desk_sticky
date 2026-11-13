@@ -28,7 +28,7 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            opacity: 15,
+            opacity: 48,
             blur_mode: "acrylic".to_string(),
             theme: "light".to_string(),
             always_on_top: false,
@@ -43,8 +43,29 @@ impl Default for AppSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppStateData {
-    pub todos: Vec<TodoItem>,
-    pub settings: AppSettings,
+    pub todos: Option<Vec<TodoItem>>,
+    pub settings: Option<AppSettings>,
+    pub todos_error: Option<String>,
+    pub settings_error: Option<String>,
+}
+
+fn split_load<T: for<'de> Deserialize<'de> + Default>(path: &Path) -> (Option<T>, Option<String>) {
+    match load_json_or_default::<T>(path) {
+        Ok(value) => (Some(value), None),
+        Err(message) => (None, Some(message)),
+    }
+}
+
+/// 待办和设置分开读取。一边失败时另一边仍返回已读到的数据，调用方不得据此覆盖失败的那个文件。
+pub fn load_app_files(data_dir: &Path) -> AppStateData {
+    let (todos, todos_error) = split_load::<Vec<TodoItem>>(&todos_path(data_dir));
+    let (settings, settings_error) = split_load::<AppSettings>(&settings_path(data_dir));
+    AppStateData {
+        todos,
+        settings,
+        todos_error,
+        settings_error,
+    }
 }
 
 pub fn atomic_write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
@@ -123,7 +144,7 @@ mod tests {
         let dir = temp_test_dir("settings");
         let path = settings_path(&dir);
         let def: AppSettings = load_json_or_default(&path).expect("default should load");
-        assert_eq!(def.opacity, 15);
+        assert_eq!(def.opacity, 48);
         assert_eq!(def.theme, "light");
         assert!(!def.always_on_top);
         assert!(!def.launch_at_startup);
@@ -142,6 +163,33 @@ mod tests {
         let loaded: AppSettings = load_json_or_default(&path).expect("load settings");
         assert_eq!(loaded.opacity, 65);
         assert_eq!(loaded.target_monitor_id.as_deref(), Some("\\\\.\\DISPLAY2"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_corrupt_settings_keep_todos_file() {
+        let dir = temp_test_dir("partial");
+        let todos = todos_path(&dir);
+        let settings = settings_path(&dir);
+        let items = vec![TodoItem {
+            id: "1".to_string(),
+            content: "保留".to_string(),
+            completed: false,
+            created_at: 1000,
+            updated_at: 1000,
+        }];
+        atomic_write_json(&todos, &items).expect("write todos");
+        fs::write(&settings, b"{").expect("write broken settings");
+        let todos_before = fs::read(&todos).expect("read todos");
+        let settings_before = fs::read(&settings).expect("read settings");
+
+        let loaded = load_app_files(&dir);
+        assert_eq!(loaded.todos.expect("todos").len(), 1);
+        assert!(loaded.todos_error.is_none());
+        assert!(loaded.settings.is_none());
+        assert!(loaded.settings_error.is_some());
+        assert_eq!(fs::read(&todos).expect("todos unchanged"), todos_before);
+        assert_eq!(fs::read(&settings).expect("settings unchanged"), settings_before);
         let _ = fs::remove_dir_all(&dir);
     }
 }

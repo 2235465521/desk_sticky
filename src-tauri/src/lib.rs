@@ -4,8 +4,8 @@ mod win32_window;
 
 use std::sync::Mutex;
 use storage::{
-    atomic_write_json, load_json_or_default, settings_path, todos_path, AppSettings, AppStateData,
-    TodoItem,
+    atomic_write_json, load_app_files, load_json_or_default, settings_path, todos_path, AppSettings,
+    AppStateData, TodoItem,
 };
 use tauri::{
     menu::{Menu, MenuItem},
@@ -34,6 +34,35 @@ fn get_hwnd(window: &tauri::WebviewWindow) -> Result<isize, String> {
         .hwnd()
         .map(|h| h.0 as isize)
         .map_err(|e| format!("获取窗口句柄失败: {}", e))
+}
+
+fn recover_offscreen_window(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let Ok(hwnd) = get_hwnd(&window) else {
+        return;
+    };
+    let monitors = list_monitors();
+    if is_window_on_any_monitor(hwnd, &monitors) {
+        return;
+    }
+    let state = app.state::<RuntimeState>();
+    if let Ok(mut guard) = state.is_edge_hidden.lock() {
+        *guard = false;
+    }
+    let settings = state
+        .settings
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_default();
+    let height = state
+        .logical_height
+        .lock()
+        .map(|guard| *guard)
+        .unwrap_or(450.0);
+    let _ = reposition_window(&window, &settings, height);
+    let _ = app.emit("edge-unhide", ());
 }
 
 fn reposition_window(
@@ -69,14 +98,14 @@ fn load_app_state(
         .app_data_dir()
         .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
 
-    let todos: Vec<TodoItem> = load_json_or_default(&todos_path(&data_dir))?;
-    let settings: AppSettings = load_json_or_default(&settings_path(&data_dir))?;
-
-    if let Ok(mut guard) = state.settings.lock() {
-        *guard = settings.clone();
+    let data = load_app_files(&data_dir);
+    if let Some(settings) = data.settings.clone() {
+        if let Ok(mut guard) = state.settings.lock() {
+            *guard = settings;
+        }
     }
 
-    Ok(AppStateData { todos, settings })
+    Ok(data)
 }
 
 #[tauri::command]
@@ -173,8 +202,22 @@ fn set_always_on_top(
     Ok(())
 }
 
-#[tauri::command]
-fn set_launch_at_startup(enabled: bool) -> Result<(), String> {
+fn read_launch_at_startup() -> Result<bool, String> {
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let run_key = hkcu
+        .open_subkey_with_flags(
+            "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+            KEY_READ,
+        )
+        .map_err(|e| format!("无法读取注册表启动项: {}", e))?;
+    match run_key.get_value::<String, _>("DeskSticky") {
+        Ok(value) => Ok(!value.trim().is_empty()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(err) => Err(format!("无法读取开机启动项: {}", err)),
+    }
+}
+
+fn write_launch_at_startup(enabled: bool) -> Result<(), String> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let run_key = hkcu
         .open_subkey_with_flags(
@@ -198,6 +241,38 @@ fn set_launch_at_startup(enabled: bool) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+#[tauri::command]
+fn get_launch_at_startup() -> Result<bool, String> {
+    read_launch_at_startup()
+}
+
+#[tauri::command]
+fn commit_launch_at_startup(
+    app: AppHandle,
+    state: State<RuntimeState>,
+    settings: AppSettings,
+) -> Result<bool, String> {
+    let previous = read_launch_at_startup()?;
+    write_launch_at_startup(settings.launch_at_startup)?;
+    let actual = read_launch_at_startup()?;
+    let mut stored = settings;
+    stored.launch_at_startup = actual;
+
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
+    if let Err(err) = atomic_write_json(&settings_path(&data_dir), &stored) {
+        let _ = write_launch_at_startup(previous);
+        return Err(err);
+    }
+
+    if let Ok(mut guard) = state.settings.lock() {
+        *guard = stored;
+    }
+    Ok(actual)
 }
 
 #[tauri::command]
@@ -358,25 +433,7 @@ pub fn run() {
                 let app_handle = handle_for_display.clone();
                 let inner_handle = app_handle.clone();
                 let _ = app_handle.run_on_main_thread(move || {
-                    let state = inner_handle.state::<RuntimeState>();
-                    let settings = state
-                        .settings
-                        .lock()
-                        .map(|g| g.clone())
-                        .unwrap_or_default();
-                    let h = state
-                        .logical_height
-                        .lock()
-                        .map(|g| *g)
-                        .unwrap_or(280.0);
-                    if let Some(w) = inner_handle.get_webview_window("main") {
-                        if let Ok(hwnd) = get_hwnd(&w) {
-                            let monitors = list_monitors();
-                            if !is_window_on_any_monitor(hwnd, &monitors) {
-                                let _ = reposition_window(&w, &settings, h);
-                            }
-                        }
-                    }
+                    recover_offscreen_window(&inner_handle);
                 });
             });
 
@@ -501,8 +558,18 @@ pub fn run() {
                         .unwrap_or(450.0);
                     if let Some(w) = app.get_webview_window("main") {
                         if let Ok(hwnd) = get_hwnd(&w) {
-                            // Keep current dragged (x, y) when crossing monitors with different DPIs
+                            let was_hidden = state
+                                .is_edge_hidden
+                                .lock()
+                                .map(|guard| *guard)
+                                .unwrap_or(false);
                             resize_window_preserving_position(hwnd, *scale_factor, 400.0, h);
+                            if was_hidden {
+                                if let Ok(mut guard) = state.is_edge_hidden.lock() {
+                                    *guard = false;
+                                }
+                                let _ = app.emit("edge-unhide", ());
+                            }
                         }
                     }
                 }
@@ -517,7 +584,8 @@ pub fn run() {
             apply_window_layout,
             set_backdrop,
             set_always_on_top,
-            set_launch_at_startup,
+            get_launch_at_startup,
+            commit_launch_at_startup,
             get_edge_hide_probe,
             is_docked_right,
             set_edge_hidden,

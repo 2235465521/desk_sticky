@@ -20,9 +20,12 @@
 ## 开发与构建
 
 ### 环境要求
-- Node.js 18+
+开发机需要：
+- Node.js 20 或更高版本
 - Rust 工具链 (stable-msvc)
-- Windows 10/11（需安装 Microsoft Edge WebView2 运行时）
+- Windows 10/11
+
+成品运行不需要 Node.js 或 Rust。标准安装包在缺少 WebView2 时会联网下载安装运行时。`npm run tauri build -- --no-bundle` 生成的 exe 不带安装器，目标电脑需要已经安装 WebView2。
 
 ### 常用命令
 ```bash
@@ -39,10 +42,12 @@ npm run tauri dev
 npm test
 cargo test --manifest-path src-tauri/Cargo.toml
 
-# 编译单文件绿色版 exe（输出在 src-tauri/target/release/desk-sticky.exe）
+# 编译不带安装器的 exe（输出在 src-tauri/target/release/desk-sticky.exe）
+# 该文件不负责安装 WebView2
 npm run tauri build -- --no-bundle
 
 # 编译标准安装包（输出在 src-tauri/target/release/bundle/）
+# 缺少 WebView2 时，安装器需要联网下载运行时
 npm run tauri build
 ```
 

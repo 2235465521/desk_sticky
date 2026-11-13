@@ -74,34 +74,54 @@
   --core-alpha-light-16: rgba(24, 24, 27, 0.05);
   --core-alpha-light-24: rgba(24, 24, 27, 0.09);
   --core-alpha-light-40: rgba(24, 24, 27, 0.16);
+
+  --liquid-ink: #f2f6ff;
+  --liquid-ink-dim: #93a2bf;
+  --liquid-tile-start: #ffffff;
+  --liquid-tile-end: #dce8ff;
+  --liquid-tile-ink: #1a2744;
+  --liquid-title: #ffffff;
+  --liquid-panel: rgba(14, 18, 32, 0.9);
+  --liquid-panel-ink: #f7f9ff;
+  --liquid-panel-ink-dim: #d5deee;
+  --liquid-panel-ink-mute: #b7c3d9;
 }
 
 /* Color System — Layer 2 (Dark Mode) */
 [data-theme="dark"] {
-  --border-window: rgba(255, 255, 255, 0.28);
+  --border-window: rgba(255, 255, 255, 0.24);
   --border-primary: rgba(255, 255, 255, 0.14);
   --border-subtle: rgba(255, 255, 255, 0.08);
   --border-action-primary: var(--core-primary-400);
   --border-error: var(--core-red-400);
 
-  --surface-card: rgba(39, 39, 39, 0.42);
-  --surface-card-hover: rgba(49, 49, 49, 0.72);
-  --surface-card-completed: rgba(59, 130, 246, 0.26);
-  --border-card-completed: rgba(96, 165, 250, 0.62);
-  --text-completed: #93c5fd;
-  --surface-input: rgba(31, 31, 31, 0.56);
-  --surface-input-focus: rgba(31, 31, 31, 0.82);
-  --surface-popover: rgba(24, 24, 24, 0.94);
+  --surface-card: rgba(44, 44, 48, 0.88);
+  --surface-card-hover: rgba(54, 54, 58, 0.94);
+  --surface-card-completed: rgba(39, 39, 42, 0.72);
+  --border-card-completed: rgba(82, 82, 91, 0.55);
+  --text-completed: #a1a1aa;
+  --surface-input: rgba(39, 39, 42, 0.9);
+  --surface-input-focus: rgba(50, 50, 54, 0.96);
+  --surface-popover: rgba(28, 28, 32, 0.96);
 
-  --action-primary: var(--core-primary-500);
-  --action-primary-hover: var(--core-primary-600);
+  --action-primary: var(--core-primary-600);
+  --action-primary-hover: var(--core-primary-700);
   --action-secondary: rgba(255, 255, 255, 0.08);
   --action-secondary-hover: rgba(255, 255, 255, 0.14);
   --action-danger-hover: rgba(239, 68, 68, 0.18);
 
-  --text-primary: var(--core-grayscale-50);
-  --text-secondary: var(--core-grayscale-200);
-  --text-tertiary: #8e8e93;
+  --text-primary: #f4f4f5;
+  --text-secondary: #d4d4d8;
+  --text-tertiary: #a1a1aa;
+  --panel-text-primary: #f4f4f5;
+  --panel-text-secondary: #d4d4d8;
+  --panel-text-tertiary: #a1a1aa;
+  --panel-icon-secondary: #a1a1aa;
+  --panel-border-primary: rgba(255, 255, 255, 0.22);
+  --panel-border-subtle: rgba(255, 255, 255, 0.12);
+  --panel-action-secondary: rgba(255, 255, 255, 0.08);
+  --panel-action-secondary-hover: rgba(255, 255, 255, 0.16);
+  --panel-surface-input: rgba(39, 39, 42, 0.9);
   --text-inverted: var(--core-grayscale-00);
   --text-error: var(--core-red-400);
   --text-info: var(--core-primary-350);
@@ -112,36 +132,45 @@
   --icon-error: var(--core-red-400);
   --icon-success: var(--core-green-400);
 
-  --shadow-card-hover: 0 6px 18px rgba(0, 0, 0, 0.34);
-  --shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.48);
+  --shadow-card-hover: 0 2px 10px rgba(0, 0, 0, 0.22);
+  --shadow-popover: 0 12px 28px rgba(0, 0, 0, 0.4);
 }
 
 /* Color System — Layer 2 (Light Mode) */
 [data-theme="light"] {
-  --border-window: rgba(255, 255, 255, 0.52);
+  --border-window: rgba(255, 255, 255, 0.48);
   --border-primary: rgba(255, 255, 255, 0.55);
   --border-subtle: rgba(255, 255, 255, 0.48);
   --border-action-primary: var(--core-primary-500);
   --border-error: var(--core-red-500);
 
-  --surface-card: rgba(255, 255, 255, 0.72);
-  --surface-card-hover: rgba(255, 255, 255, 0.9);
-  --surface-card-completed: rgba(219, 234, 254, 0.85);
-  --border-card-completed: rgba(37, 99, 235, 0.78);
-  --text-completed: #1d4ed8;
-  --surface-input: rgba(255, 255, 255, 0.54);
-  --surface-input-focus: rgba(255, 255, 255, 0.86);
-  --surface-popover: rgba(255, 255, 255, 0.9);
+  --surface-card: rgba(255, 255, 255, 0.94);
+  --surface-card-hover: rgba(255, 255, 255, 1);
+  --surface-card-completed: rgba(244, 244, 245, 0.92);
+  --border-card-completed: rgba(228, 228, 231, 0.95);
+  --text-completed: #71717a;
+  --surface-input: rgba(255, 255, 255, 0.92);
+  --surface-input-focus: rgba(255, 255, 255, 1);
+  --surface-popover: rgba(255, 255, 255, 0.98);
 
-  --action-primary: var(--core-primary-500);
-  --action-primary-hover: var(--core-primary-600);
+  --action-primary: var(--core-primary-600);
+  --action-primary-hover: var(--core-primary-700);
   --action-secondary: rgba(255, 255, 255, 0.38);
   --action-secondary-hover: rgba(255, 255, 255, 0.62);
   --action-danger-hover: rgba(239, 68, 68, 0.14);
 
-  --text-primary: var(--core-grayscale-870);
-  --text-secondary: var(--core-grayscale-500);
-  --text-tertiary: var(--core-grayscale-400);
+  --text-primary: #18181b;
+  --text-secondary: #3f3f46;
+  --text-tertiary: #52525b;
+  --panel-text-primary: #18181b;
+  --panel-text-secondary: #3f3f46;
+  --panel-text-tertiary: #52525b;
+  --panel-icon-secondary: #3f3f46;
+  --panel-border-primary: rgba(24, 24, 27, 0.28);
+  --panel-border-subtle: rgba(24, 24, 27, 0.14);
+  --panel-action-secondary: rgba(24, 24, 27, 0.04);
+  --panel-action-secondary-hover: rgba(24, 24, 27, 0.1);
+  --panel-surface-input: #ffffff;
   --text-inverted: var(--core-grayscale-00);
   --text-error: var(--core-red-500);
   --text-info: var(--core-primary-600);
@@ -152,8 +181,8 @@
   --icon-error: var(--core-red-500);
   --icon-success: var(--core-green-600);
 
-  --shadow-card-hover: 0 6px 18px rgba(15, 23, 42, 0.12);
-  --shadow-popover: 0 12px 32px rgba(15, 23, 42, 0.16);
+  --shadow-card-hover: 0 2px 10px rgba(15, 23, 42, 0.06);
+  --shadow-popover: 0 12px 28px rgba(15, 23, 42, 0.12);
 }
 
 /* Named Text Styles */

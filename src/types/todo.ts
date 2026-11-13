@@ -21,8 +21,10 @@ export interface AppSettings {
 }
 
 export interface AppStateData {
-  todos: TodoItem[];
-  settings: AppSettings;
+  todos: TodoItem[] | null;
+  settings: AppSettings | null;
+  todosError: string | null;
+  settingsError: string | null;
 }
 
 export interface MonitorDescriptor {
@@ -37,7 +39,7 @@ export interface MonitorDescriptor {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  opacity: 15,
+  opacity: 48,
   blurMode: "acrylic",
   theme: "light",
   alwaysOnTop: false,

@@ -4,14 +4,16 @@ use std::mem::size_of;
 use std::sync::atomic::{AtomicBool, Ordering};
 use windows::core::{s, PCSTR};
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
-use windows::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_TRANSITIONS_FORCEDISABLED};
+use windows::Win32::Graphics::Dwm::{
+    DwmSetWindowAttribute, DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_TRANSITIONS_FORCEDISABLED, DWMSBT_NONE,
+};
 use windows::Win32::Graphics::Gdi::{
-    EnumDisplayMonitors, GetMonitorInfoW, MonitorFromWindow, SetWindowRgn, HDC, HMONITOR,
-    MONITORINFOEXW, MONITOR_DEFAULTTONEAREST,
+    CreateRoundRectRgn, EnumDisplayMonitors, GetMonitorInfoW, MonitorFromWindow, SetWindowRgn,
+    HDC, HMONITOR, MONITORINFOEXW, MONITOR_DEFAULTTONEAREST,
 };
 use windows::Win32::System::LibraryLoader::{GetModuleHandleA, GetModuleHandleW};
 use windows::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
-use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
+use windows::Win32::UI::HiDpi::{GetDpiForMonitor, GetDpiForWindow, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetClassNameW, GetCursorPos,
@@ -334,8 +336,7 @@ pub fn apply_window_rect(hwnd_raw: isize, rect: WindowRectPx) {
             rect.height,
             SWP_NOZORDER | SWP_NOACTIVATE,
         );
-        // Clear any window region so transparent WebView2 anti-aliased rounded corners & 3D tilt are never clipped
-        let _ = SetWindowRgn(hwnd, None, true);
+        apply_card_clip(hwnd);
     }
 }
 
@@ -357,7 +358,7 @@ pub fn resize_window_preserving_position(
             height,
             SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
         );
-        let _ = SetWindowRgn(hwnd, None, true);
+        apply_card_clip(hwnd);
     }
 }
 
@@ -507,11 +508,50 @@ struct WindowCompositionAttribData {
 type SetWindowCompositionAttributeFn =
     unsafe extern "system" fn(HWND, *mut WindowCompositionAttribData) -> BOOL;
 
+const ACCENT_DISABLED: u32 = 0;
+const WCA_ACCENT_POLICY: u32 = 19;
+
+/// 按卡片圆角裁切，避免系统模糊铺成直角。贴边窄条不裁，否则收起条会消失。
+fn apply_card_clip(hwnd: HWND) {
+    unsafe {
+        let mut rect = RECT::default();
+        if GetWindowRect(hwnd, &mut rect).is_err() {
+            return;
+        }
+        let width = rect.right - rect.left;
+        let height = rect.bottom - rect.top;
+        let dpi = GetDpiForWindow(hwnd).max(96) as f64;
+        let pad = (20.0 * dpi / 96.0).round() as i32;
+        let radius = (28.0 * dpi / 96.0).round().max(8.0) as i32;
+        if width <= pad * 2 + 24 || height <= pad * 2 + 24 {
+            let _ = SetWindowRgn(hwnd, None, true);
+            return;
+        }
+        let region = CreateRoundRectRgn(
+            pad,
+            pad,
+            width - pad,
+            height - pad,
+            radius * 2,
+            radius * 2,
+        );
+        if region.is_invalid() {
+            return;
+        }
+        let _ = SetWindowRgn(hwnd, region, true);
+    }
+}
+
 pub fn apply_backdrop(hwnd_raw: isize, _opacity_percent: u8, _blur_mode: &str, _is_dark: bool) {
     let hwnd = HWND(hwnd_raw as *mut c_void);
-    // Disable DWM rectangular Acrylic backing so the transparent 3D-tilted card
-    // floats cleanly without a white rectangular box behind its curved corners.
     unsafe {
+        let backdrop_type = DWMSBT_NONE;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_SYSTEMBACKDROP_TYPE,
+            &backdrop_type as *const _ as *const c_void,
+            size_of::<i32>() as u32,
+        );
         if let Ok(user32) = GetModuleHandleA(s!("user32.dll")) {
             if let Some(proc_addr) = windows::Win32::System::LibraryLoader::GetProcAddress(
                 user32,
@@ -519,19 +559,20 @@ pub fn apply_backdrop(hwnd_raw: isize, _opacity_percent: u8, _blur_mode: &str, _
             ) {
                 let func: SetWindowCompositionAttributeFn = std::mem::transmute(proc_addr);
                 let mut policy = AccentPolicy {
-                    accent_state: 0, // ACCENT_DISABLED
+                    accent_state: ACCENT_DISABLED,
                     accent_flags: 0,
                     gradient_color: 0,
                     animation_id: 0,
                 };
                 let mut data = WindowCompositionAttribData {
-                    attrib: 19,
+                    attrib: WCA_ACCENT_POLICY,
                     pv_data: &mut policy as *mut _ as *mut c_void,
                     cb_data: size_of::<AccentPolicy>(),
                 };
                 let _ = func(hwnd, &mut data);
             }
         }
+        apply_card_clip(hwnd);
     }
 }
 

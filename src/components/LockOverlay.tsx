@@ -1,5 +1,5 @@
 import { Key, Lock, LockOpen } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface LockOverlayProps {
   mode: "unlock" | "setup";
@@ -19,6 +19,13 @@ export function LockOverlay({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    setPassword("");
+    setConfirm("");
+    setError(null);
+    setSubmitting(false);
+  }, [mode]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
@@ -30,28 +37,33 @@ export function LockOverlay({
     }
 
     setSubmitting(true);
+    let keepForm = true;
     try {
       if (mode === "unlock") {
         const ok = await onUnlock(password);
         if (!ok) {
           setError("密码错误，请重试");
           setPassword("");
+        } else {
+          keepForm = false;
         }
       } else {
         if (password.length < 4) {
           setError("密码至少需要 4 位");
-          setSubmitting(false);
           return;
         }
         if (password !== confirm) {
           setError("两次输入的密码不一致");
-          setSubmitting(false);
           return;
         }
         await onSavePassword(password);
+        keepForm = false;
       }
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      setError(detail || "保存密码失败");
     } finally {
-      setSubmitting(false);
+      if (keepForm) setSubmitting(false);
     }
   };
 
@@ -89,6 +101,8 @@ export function LockOverlay({
             autoFocus
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "lock-password-error" : undefined}
             placeholder={mode === "unlock" ? "输入密码" : "输入新密码（至少 4 位）"}
             className="body-6 w-full px-3 py-1.5 rounded-lg border outline-none select-text"
             style={{
@@ -114,7 +128,7 @@ export function LockOverlay({
           )}
 
           {error && (
-            <p className="caption-5 text-left" style={{ color: "var(--text-error)" }}>
+            <p id="lock-password-error" role="alert" className="caption-5 text-left" style={{ color: "var(--text-error)" }}>
               {error}
             </p>
           )}

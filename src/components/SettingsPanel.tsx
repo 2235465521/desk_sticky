@@ -1,5 +1,5 @@
 import { X } from "@phosphor-icons/react";
-import { AppSettings, BlurMode, MonitorDescriptor, ThemePreference } from "../types/todo";
+import { AppSettings, MonitorDescriptor, ThemePreference } from "../types/todo";
 
 interface SettingsPanelProps {
   settings: AppSettings;
@@ -20,7 +20,7 @@ export function SettingsPanel({
 }: SettingsPanelProps) {
   return (
     <div
-      className="mx-3 mb-3 p-3 rounded-lg border flex flex-col gap-3 shrink-0"
+      className="settings-panel mx-3 mb-3 p-3 rounded-lg border flex flex-col gap-3 shrink-0"
       style={{
         backgroundColor: "var(--surface-popover)",
         borderColor: "var(--border-primary)",
@@ -45,73 +45,32 @@ export function SettingsPanel({
       {/* Opacity Slider */}
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between">
-          <span className="caption-4" style={{ color: "var(--text-secondary)" }}>
+          <label htmlFor="opacity-slider" className="caption-4" style={{ color: "var(--text-secondary)" }}>
             背景不透明度
-          </span>
+          </label>
           <span className="caption-4 tabular-nums" style={{ color: "var(--text-primary)" }}>
             {settings.opacity}%
           </span>
         </div>
         <input
+          id="opacity-slider"
           type="range"
-          min={5}
+          min={0}
           max={100}
           step={1}
           value={settings.opacity}
+          aria-valuetext={`${settings.opacity}%`}
           onChange={(e) => onUpdate({ opacity: Number(e.target.value) })}
           className="w-full accent-[var(--action-primary)] cursor-pointer"
         />
       </div>
 
-      {/* Blur Mode */}
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center justify-between">
-          <span className="caption-4" style={{ color: "var(--text-secondary)" }}>
-            背景模糊模式
-          </span>
-          <div className="flex gap-1">
-            {(
-              [
-                { value: "acrylic", label: "柔和亚克力" },
-                { value: "blur", label: "标准模糊" },
-              ] as { value: BlurMode; label: string }[]
-            ).map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => onUpdate({ blurMode: opt.value })}
-                className="interactive-btn button-xsm px-2 py-1 rounded-md border"
-                style={{
-                  backgroundColor:
-                    settings.blurMode === opt.value
-                      ? "var(--action-primary)"
-                      : "var(--action-secondary)",
-                  borderColor:
-                    settings.blurMode === opt.value
-                      ? "var(--border-action-primary)"
-                      : "var(--border-subtle)",
-                  color:
-                    settings.blurMode === opt.value
-                      ? "var(--text-inverted)"
-                      : "var(--text-secondary)",
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <p className="caption-5" style={{ color: "var(--text-tertiary)" }}>
-          注：Windows 系统 DWM 接口未开放自定义高斯模糊半径，仅支持切换模糊模式与调节不透明度。
-        </p>
-      </div>
-
       {/* Theme */}
       <div className="flex items-center justify-between">
-        <span className="caption-4" style={{ color: "var(--text-secondary)" }}>
+        <span className="caption-4" id="theme-label" style={{ color: "var(--text-secondary)" }}>
           外观主题
         </span>
-        <div className="flex gap-1">
+        <div className="flex gap-1" role="group" aria-labelledby="theme-label">
           {(
             [
               { value: "system", label: "跟随系统" },
@@ -121,21 +80,22 @@ export function SettingsPanel({
           ).map((opt) => (
             <button
               key={opt.value}
-              type="button"
-              onClick={() => onUpdate({ theme: opt.value })}
+                type="button"
+                aria-pressed={settings.theme === opt.value}
+                onClick={() => onUpdate({ theme: opt.value })}
               className="interactive-btn button-xsm px-2 py-1 rounded-md border"
               style={{
                 backgroundColor:
                   settings.theme === opt.value
-                    ? "var(--action-primary)"
-                    : "var(--action-secondary)",
+                    ? "var(--action-secondary-hover)"
+                    : "transparent",
                 borderColor:
                   settings.theme === opt.value
-                    ? "var(--border-action-primary)"
+                    ? "var(--border-primary)"
                     : "var(--border-subtle)",
                 color:
                   settings.theme === opt.value
-                    ? "var(--text-inverted)"
+                    ? "var(--text-primary)"
                     : "var(--text-secondary)",
               }}
             >
@@ -147,15 +107,16 @@ export function SettingsPanel({
 
       {/* Target Monitor */}
       <div className="flex items-center justify-between gap-2">
-        <span className="caption-4 shrink-0" style={{ color: "var(--text-secondary)" }}>
+        <label htmlFor="monitor-select" className="caption-4 shrink-0" style={{ color: "var(--text-secondary)" }}>
           显示屏幕
-        </span>
+        </label>
         <select
+          id="monitor-select"
           value={settings.targetMonitorId ?? ""}
           onChange={(e) =>
             onUpdate({ targetMonitorId: e.target.value ? e.target.value : null })
           }
-          className="caption-4 px-2 py-1 rounded-md border outline-none max-w-[190px] truncate"
+          className="caption-4 px-2 py-1 rounded-md border focus-ring max-w-[190px] truncate"
           style={{
             backgroundColor: "var(--surface-input)",
             borderColor: "var(--border-primary)",
@@ -172,7 +133,7 @@ export function SettingsPanel({
       </div>
 
       {/* Toggles */}
-      <div className="flex items-center justify-between">
+      <label className="flex items-center justify-between">
         <span className="caption-4" style={{ color: "var(--text-secondary)" }}>
           贴近右侧自动隐藏
         </span>
@@ -182,9 +143,9 @@ export function SettingsPanel({
           onChange={(e) => onUpdate({ edgeAutoHide: e.target.checked })}
           className="w-4 h-4 accent-[var(--action-primary)] cursor-pointer"
         />
-      </div>
+      </label>
 
-      <div className="flex items-center justify-between">
+      <label className="flex items-center justify-between">
         <span className="caption-4" style={{ color: "var(--text-secondary)" }}>
           始终置顶
         </span>
@@ -194,9 +155,9 @@ export function SettingsPanel({
           onChange={(e) => onUpdate({ alwaysOnTop: e.target.checked })}
           className="w-4 h-4 accent-[var(--action-primary)] cursor-pointer"
         />
-      </div>
+      </label>
 
-      <div className="flex items-center justify-between">
+      <label className="flex items-center justify-between">
         <span className="caption-4" style={{ color: "var(--text-secondary)" }}>
           开机自动启动
         </span>
@@ -206,7 +167,7 @@ export function SettingsPanel({
           onChange={(e) => onUpdate({ launchAtStartup: e.target.checked })}
           className="w-4 h-4 accent-[var(--action-primary)] cursor-pointer"
         />
-      </div>
+      </label>
 
       {/* Password Lock Management */}
       <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: "var(--border-subtle)" }}>

@@ -2,11 +2,12 @@ import { Plus } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 
 interface TodoInputProps {
+  value: string;
+  onChange: (value: string) => void;
   onAdd: (content: string) => void;
 }
 
-export function TodoInput({ onAdd }: TodoInputProps) {
-  const [value, setValue] = useState("");
+export function TodoInput({ value, onChange, onAdd }: TodoInputProps) {
   const [focused, setFocused] = useState(false);
   const isComposingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -32,7 +33,6 @@ export function TodoInput({ onAdd }: TodoInputProps) {
     const trimmed = value.trim();
     if (!trimmed) return;
     onAdd(trimmed);
-    setValue("");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -48,10 +48,10 @@ export function TodoInput({ onAdd }: TodoInputProps) {
   return (
     <div className="px-3 pb-2 shrink-0">
       <div
-        className="flex items-end gap-2 px-3 py-2 rounded-lg border transition-colors"
+        className="todo-input-frame flex items-end gap-2 px-3 py-2 rounded-xl border transition-colors"
         style={{
           backgroundColor: focused ? "var(--surface-input-focus)" : "var(--surface-input)",
-          borderColor: focused ? "var(--border-action-primary)" : "var(--border-primary)",
+          borderColor: focused ? "var(--border-action-primary)" : "var(--border-subtle)",
           transitionDuration: "var(--duration-color)",
           transitionTimingFunction: "var(--ease-decel)",
         }}
@@ -60,7 +60,7 @@ export function TodoInput({ onAdd }: TodoInputProps) {
           ref={textareaRef}
           rows={1}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => onChange(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onCompositionStart={() => {

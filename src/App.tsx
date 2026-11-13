@@ -9,6 +9,12 @@ import { TitleBar } from "./components/TitleBar";
 import { TodoInput } from "./components/TodoInput";
 import { UndoToast } from "./components/UndoToast";
 import { useResolvedTheme } from "./hooks/useTheme";
+import {
+  applySaveResult,
+  canPersistDomain,
+  describeDataStatus,
+  resolveDomainLoad,
+} from "./utils/loadGate";
 import { hashPassword } from "./utils/password";
 import { computeTiltAngles } from "./utils/tilt3d";
 import {
@@ -19,12 +25,73 @@ import {
   TodoItem,
 } from "./types/todo";
 
+const TILT_PERSPECTIVE = "1100px";
+const TILT_MAX_DEG = 7;
+const TILT_REST = `perspective(${TILT_PERSPECTIVE}) rotateX(0deg) rotateY(0deg)`;
+const UNFOCUSED_OPACITY_FACTOR = 0.85;
+
 interface DeletedRecord {
   item: TodoItem;
   index: number;
 }
 
 const FIXED_LOGICAL_HEIGHT = 450;
+
+function DataStatus({
+  todosLoad,
+  settingsLoad,
+  todosLoadError,
+  settingsLoadError,
+  monitorsError,
+  onRetry,
+}: {
+  todosLoad: "loading" | "ready" | "error";
+  settingsLoad: "loading" | "ready" | "error";
+  todosLoadError: string | null;
+  settingsLoadError: string | null;
+  monitorsError: string | null;
+  onRetry: () => void;
+}) {
+  const status = describeDataStatus({
+    todosPhase: todosLoad,
+    settingsPhase: settingsLoad,
+    todosError: todosLoadError,
+    settingsError: settingsLoadError,
+    monitorsError,
+  });
+  if (status.messages.length === 0) return null;
+  return (
+    <div className="px-3 pb-2 shrink-0">
+      <div
+        className="flex flex-col gap-2 px-3 py-2 rounded-lg border caption-5"
+        style={{
+          backgroundColor: "var(--surface-popover)",
+          borderColor: status.showRetry ? "var(--border-error)" : "var(--border-primary)",
+          color: status.showRetry ? "var(--text-error)" : "var(--text-secondary)",
+        }}
+      >
+        {status.messages.map((message) => (
+          <span key={message} className="break-words">
+            {message}
+          </span>
+        ))}
+        {status.showRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="interactive-btn button-xsm self-start px-2 py-1 rounded-md"
+            style={{
+              backgroundColor: "var(--action-primary)",
+              color: "var(--text-inverted)",
+            }}
+          >
+            重试加载
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function App() {
   const [todos, setTodos] = useState<TodoItem[]>([]);
@@ -33,10 +100,21 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [settingUpPassword, setSettingUpPassword] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [todosSaveError, setTodosSaveError] = useState<string | null>(null);
+  const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
   const [deletedRecord, setDeletedRecord] = useState<DeletedRecord | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const [todosLoad, setTodosLoad] = useState<"loading" | "ready" | "error">("loading");
+  const [settingsLoad, setSettingsLoad] = useState<"loading" | "ready" | "error">("loading");
+  const [todosLoadError, setTodosLoadError] = useState<string | null>(null);
+  const [settingsLoadError, setSettingsLoadError] = useState<string | null>(null);
+  const [monitorsError, setMonitorsError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [isEdgeHidden, setIsEdgeHidden] = useState(false);
+  const [windowFocused, setWindowFocused] = useState(() =>
+    typeof document !== "undefined" ? document.hasFocus() : true
+  );
+  const [shellHot, setShellHot] = useState(false);
 
   const undoTimerRef = useRef<number | null>(null);
   const hideTimerRef = useRef<number | null>(null);
@@ -45,6 +123,20 @@ export function App() {
   const mountedAtRef = useRef<number>(Date.now());
   const tiltCardRef = useRef<HTMLDivElement>(null);
   const tiltRafRef = useRef<number | null>(null);
+  const tiltSettledRef = useRef(true);
+  const liquidSpringRef = useRef({ glow: 0, glowV: 0 });
+  const todosLoadRef = useRef(todosLoad);
+  const settingsLoadRef = useRef(settingsLoad);
+  const settingsRef = useRef(settings);
+  const todosRevisionRef = useRef(0);
+  const settingsRevisionRef = useRef(0);
+  const failedTodosRef = useRef<TodoItem[] | null>(null);
+  const failedSettingsRef = useRef<AppSettings | null>(null);
+  todosLoadRef.current = todosLoad;
+  settingsLoadRef.current = settingsLoad;
+  settingsRef.current = settings;
+  const settingsReady = settingsLoad === "ready";
+  const todosReady = todosLoad === "ready";
   const resolvedTheme = useResolvedTheme(settings.theme);
 
   const activeCount = useMemo(
@@ -56,33 +148,61 @@ export function App() {
     [todos]
   );
 
-  // Initial load from Rust backend
   useEffect(() => {
-    let mounted = true;
+    let active = true;
+    setTodosLoad("loading");
+    setSettingsLoad("loading");
+    setTodosLoadError(null);
+    setSettingsLoadError(null);
+    setMonitorsError(null);
     (async () => {
       try {
-        const [state, mons] = await Promise.all([
-          invoke<AppStateData>("load_app_state"),
-          invoke<MonitorDescriptor[]>("get_monitors"),
-        ]);
-        if (!mounted) return;
-        setTodos(state.todos);
-        setSettings(state.settings);
-        if (state.settings.lockPasswordHash) {
-          setIsLocked(true);
+        const state = await invoke<AppStateData>("load_app_state");
+        if (!active) return;
+        const todosResult = resolveDomainLoad(state.todos, state.todosError);
+        const settingsResult = resolveDomainLoad(state.settings, state.settingsError);
+        if (todosResult.phase === "ready" && todosResult.data !== null) {
+          setTodos(todosResult.data);
+          setTodosLoad("ready");
+          setTodosLoadError(null);
+        } else {
+          setTodosLoad("error");
+          setTodosLoadError(todosResult.error);
         }
-        setMonitors(mons);
-        setLoaded(true);
+        if (settingsResult.phase === "ready" && settingsResult.data !== null) {
+          setSettings(settingsResult.data);
+          setSettingsLoad("ready");
+          setSettingsLoadError(null);
+          if (settingsResult.data.lockPasswordHash) {
+            setIsLocked(true);
+          }
+        } else {
+          setSettingsLoad("error");
+          setSettingsLoadError(settingsResult.error);
+        }
       } catch (err) {
-        if (!mounted) return;
-        setErrorMsg(`加载本地数据失败：${String(err)}`);
-        setLoaded(true);
+        if (!active) return;
+        const message = `加载本地数据失败：${String(err)}`;
+        setTodosLoad("error");
+        setSettingsLoad("error");
+        setTodosLoadError(message);
+        setSettingsLoadError(message);
+      }
+
+      try {
+        const mons = await invoke<MonitorDescriptor[]>("get_monitors");
+        if (!active) return;
+        setMonitors(mons);
+        setMonitorsError(null);
+      } catch (err) {
+        if (!active) return;
+        setMonitorsError(String(err));
       }
     })();
     return () => {
-      mounted = false;
+      active = false;
     };
-  }, []);
+  }, [loadAttempt]);
 
   // Listen to tray "open-settings" event
   useEffect(() => {
@@ -102,42 +222,164 @@ export function App() {
 
   // Sync DWM backdrop whenever opacity, blurMode, or theme changes
   useEffect(() => {
-    if (!loaded) return;
+    if (!settingsReady) return;
     void invoke("set_backdrop", {
       opacity: settings.opacity,
       blurMode: settings.blurMode,
       isDark: resolvedTheme === "dark",
     }).catch((err) => {
-      setErrorMsg(`应用毛玻璃效果失败：${String(err)}`);
+      setSettingsSaveError(`应用毛玻璃效果失败：${String(err)}`);
     });
-  }, [loaded, settings.opacity, settings.blurMode, resolvedTheme]);
+  }, [settingsReady, settings.opacity, settings.blurMode, resolvedTheme]);
 
   // Fixed window size at top-right of target monitor (does not grow with items)
   useEffect(() => {
-    if (!loaded) return;
+    if (!settingsReady) return;
     void invoke("apply_window_layout", {
       logicalHeight: FIXED_LOGICAL_HEIGHT,
       monitorId: settings.targetMonitorId,
     }).catch(() => {
       // ignore transient layout errors
     });
-  }, [loaded, settings.targetMonitorId]);
+  }, [settingsReady, settings.targetMonitorId]);
+
+  useEffect(() => {
+    if (!settingsReady) return;
+    let active = true;
+    void (async () => {
+      try {
+        const actual = await invoke<boolean>("get_launch_at_startup");
+        if (!active || actual === settingsRef.current.launchAtStartup) return;
+        const next = { ...settingsRef.current, launchAtStartup: actual };
+        await invoke("save_settings", { settings: next });
+        if (!active) return;
+        setSettings(next);
+      } catch (err) {
+        if (!active) return;
+        setSettingsSaveError(`无法对齐开机启动状态：${String(err)}`);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [settingsReady, loadAttempt]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const resetTilt = () => {
+      if (!media.matches) return;
+      if (tiltRafRef.current !== null) {
+        cancelAnimationFrame(tiltRafRef.current);
+        tiltRafRef.current = null;
+      }
+      const card = tiltCardRef.current;
+      if (!card) return;
+      card.style.transition = "none";
+      card.style.transform = TILT_REST;
+      tiltSettledRef.current = true;
+    };
+    resetTilt();
+    media.addEventListener("change", resetTilt);
+    return () => media.removeEventListener("change", resetTilt);
+  }, []);
+
+  useEffect(() => {
+    const card = tiltCardRef.current;
+    if (!card) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      liquidSpringRef.current.glow = 0;
+      liquidSpringRef.current.glowV = 0;
+      card.style.setProperty("--liquid-glow", "0");
+      return;
+    }
+    let frame = 0;
+    let last = performance.now();
+    const step = (now: number) => {
+      const dt = Math.min(0.032, (now - last) / 1000);
+      last = now;
+      const spring = liquidSpringRef.current;
+      const target = shellHot ? 1 : 0;
+      const sub = dt / 8;
+      for (let i = 0; i < 8; i += 1) {
+        spring.glowV += (330 * (target - spring.glow) - 30 * spring.glowV) * sub;
+        spring.glow += spring.glowV * sub;
+      }
+      card.style.setProperty("--liquid-glow", spring.glow.toFixed(4));
+      const settled = Math.abs(target - spring.glow) < 0.01 && Math.abs(spring.glowV) < 0.01;
+      if (!settled) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [shellHot, isEdgeHidden]);
 
   const persistTodos = useCallback(async (nextTodos: TodoItem[]) => {
+    if (!canPersistDomain(todosLoadRef.current)) return;
+    const finished = ++todosRevisionRef.current;
+    failedTodosRef.current = nextTodos;
     try {
       await invoke("save_todos", { todos: nextTodos });
-      setErrorMsg(null);
+      if (applySaveResult(todosRevisionRef.current, finished, true) === "clear") {
+        failedTodosRef.current = null;
+        setTodosSaveError(null);
+      }
     } catch (err) {
-      setErrorMsg(`保存失败（数据未写入磁盘）：${String(err)}`);
+      if (applySaveResult(todosRevisionRef.current, finished, false) === "fail") {
+        setTodosSaveError(`保存失败（数据未写入磁盘）：${String(err)}`);
+      }
     }
   }, []);
 
   const persistSettings = useCallback(async (nextSettings: AppSettings) => {
+    if (!canPersistDomain(settingsLoadRef.current)) return;
+    const finished = ++settingsRevisionRef.current;
+    failedSettingsRef.current = nextSettings;
     try {
       await invoke("save_settings", { settings: nextSettings });
-      setErrorMsg(null);
+      if (applySaveResult(settingsRevisionRef.current, finished, true) === "clear") {
+        failedSettingsRef.current = null;
+        setSettingsSaveError(null);
+      }
     } catch (err) {
-      setErrorMsg(`保存设置失败：${String(err)}`);
+      if (applySaveResult(settingsRevisionRef.current, finished, false) === "fail") {
+        setSettingsSaveError(`保存设置失败：${String(err)}`);
+      }
+    }
+  }, []);
+
+  const commitTodos = useCallback(
+    (produce: (prev: TodoItem[]) => TodoItem[] | null) => {
+      if (!canPersistDomain(todosLoadRef.current)) return;
+      let snapshot: TodoItem[] | null = null;
+      setTodos((prev) => {
+        const next = produce(prev);
+        if (!next) return prev;
+        snapshot = next;
+        return next;
+      });
+      if (snapshot) void persistTodos(snapshot);
+    },
+    [persistTodos],
+  );
+
+  const commitLaunch = useCallback(async (next: AppSettings) => {
+    const finished = ++settingsRevisionRef.current;
+    failedSettingsRef.current = next;
+    try {
+      const actual = await invoke<boolean>("commit_launch_at_startup", { settings: next });
+      if (applySaveResult(settingsRevisionRef.current, finished, true) !== "clear") return;
+      failedSettingsRef.current = null;
+      setSettings((prev) => ({ ...prev, launchAtStartup: actual }));
+      setSettingsSaveError(null);
+    } catch (err) {
+      if (applySaveResult(settingsRevisionRef.current, finished, false) !== "fail") return;
+      setSettingsSaveError(`设置开机启动失败：${String(err)}`);
+      try {
+        const actual = await invoke<boolean>("get_launch_at_startup");
+        setSettings((prev) => ({ ...prev, launchAtStartup: actual }));
+      } catch {
+        // 注册表也读不到时，保留进入这次操作之前的勾选值。
+      }
     }
   }, []);
 
@@ -151,73 +393,57 @@ export function App() {
         createdAt: now,
         updatedAt: now,
       };
-      setTodos((prev) => {
-        const next = [nextItem, ...prev];
-        void persistTodos(next);
-        return next;
-      });
+      commitTodos((prev) => [nextItem, ...prev]);
     },
-    [persistTodos]
+    [commitTodos],
   );
 
   const handleEditTodo = useCallback(
     (id: string, nextContent: string) => {
       const now = Date.now();
-      setTodos((prev) => {
-        const next = prev.map((t) =>
-          t.id === id ? { ...t, content: nextContent, updatedAt: now } : t
-        );
-        void persistTodos(next);
-        return next;
-      });
+      commitTodos((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, content: nextContent, updatedAt: now } : item,
+        ),
+      );
     },
-    [persistTodos]
+    [commitTodos],
   );
 
   const handleToggleComplete = useCallback(
     (id: string) => {
       const now = Date.now();
-      setTodos((prev) => {
-        const next = prev.map((t) =>
-          t.id === id ? { ...t, completed: !t.completed, updatedAt: now } : t
-        );
-        void persistTodos(next);
-        return next;
-      });
+      commitTodos((prev) =>
+        prev.map((item) =>
+          item.id === id ? { ...item, completed: !item.completed, updatedAt: now } : item,
+        ),
+      );
     },
-    [persistTodos]
+    [commitTodos],
   );
 
   const handleDeleteTodo = useCallback(
     (id: string) => {
-      setTodos((prev) => {
-        const idx = prev.findIndex((t) => t.id === id);
-        if (idx === -1) return prev;
-        const target = prev[idx];
-        const next = prev.filter((t) => t.id !== id);
-        void persistTodos(next);
-
-        setDeletedRecord({ item: target, index: idx });
-        if (undoTimerRef.current) {
-          window.clearTimeout(undoTimerRef.current);
-        }
-        undoTimerRef.current = window.setTimeout(() => {
-          setDeletedRecord(null);
-        }, 5000);
-
-        return next;
+      let removed: DeletedRecord | null = null;
+      commitTodos((prev) => {
+        const index = prev.findIndex((item) => item.id === id);
+        if (index === -1) return null;
+        removed = { item: prev[index], index };
+        return prev.filter((item) => item.id !== id);
       });
+      if (!removed) return;
+      setDeletedRecord(removed);
+      if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = window.setTimeout(() => {
+        setDeletedRecord(null);
+      }, 5000);
     },
-    [persistTodos]
+    [commitTodos],
   );
 
   const handleClearCompleted = useCallback(() => {
-    setTodos((prev) => {
-      const next = prev.filter((t) => !t.completed);
-      void persistTodos(next);
-      return next;
-    });
-  }, [persistTodos]);
+    commitTodos((prev) => prev.filter((item) => !item.completed));
+  }, [commitTodos]);
 
   const handleUndoDelete = useCallback(() => {
     if (!deletedRecord) return;
@@ -227,36 +453,36 @@ export function App() {
     }
     const { item, index } = deletedRecord;
     setDeletedRecord(null);
-
-    setTodos((prev) => {
+    commitTodos((prev) => {
       const next = [...prev];
-      const insertAt = Math.min(index, next.length);
-      next.splice(insertAt, 0, item);
-      void persistTodos(next);
+      next.splice(Math.min(index, next.length), 0, item);
       return next;
     });
-  }, [deletedRecord, persistTodos]);
+  }, [deletedRecord, commitTodos]);
 
   const handleUpdateSettings = useCallback(
     (patch: Partial<AppSettings>) => {
+      if (!canPersistDomain(settingsLoadRef.current)) return;
+      const next = { ...settingsRef.current, ...patch };
+      if (patch.launchAtStartup !== undefined) {
+        void commitLaunch(next);
+        return;
+      }
+      let committed: AppSettings | null = null;
       setSettings((prev) => {
-        const next = { ...prev, ...patch };
-        void persistSettings(next);
-
-        if (patch.alwaysOnTop !== undefined) {
-          void invoke("set_always_on_top", { alwaysOnTop: patch.alwaysOnTop }).catch(
-            (err) => setErrorMsg(`切换置顶失败：${String(err)}`)
-          );
-        }
-        if (patch.launchAtStartup !== undefined) {
-          void invoke("set_launch_at_startup", {
-            enabled: patch.launchAtStartup,
-          }).catch((err) => setErrorMsg(`设置开机启动失败：${String(err)}`));
-        }
-        return next;
+        committed = { ...prev, ...patch };
+        return committed;
       });
+      if (!committed) return;
+      settingsRef.current = committed;
+      void persistSettings(committed);
+      if (patch.alwaysOnTop !== undefined) {
+        void invoke("set_always_on_top", { alwaysOnTop: patch.alwaysOnTop }).catch((err) => {
+          setSettingsSaveError(`切换置顶失败：${String(err)}`);
+        });
+      }
     },
-    [persistSettings]
+    [commitLaunch, persistSettings],
   );
 
   const handleToggleSettings = useCallback(async () => {
@@ -264,14 +490,28 @@ export function App() {
       try {
         const mons = await invoke<MonitorDescriptor[]>("get_monitors");
         setMonitors(mons);
-      } catch {
-        // ignore
+        setMonitorsError(null);
+      } catch (err) {
+        setMonitorsError(String(err));
+      }
+      if (canPersistDomain(settingsLoadRef.current)) {
+        try {
+          const actual = await invoke<boolean>("get_launch_at_startup");
+          if (actual !== settingsRef.current.launchAtStartup) {
+            const next = { ...settingsRef.current, launchAtStartup: actual };
+            await invoke("save_settings", { settings: next });
+            setSettings(next);
+          }
+        } catch (err) {
+          setSettingsSaveError(`无法对齐开机启动状态：${String(err)}`);
+        }
       }
     }
     setShowSettings((prev) => !prev);
   }, [showSettings]);
 
   const handleToggleLock = useCallback(() => {
+    if (!settingsReady) return;
     if (isLocked) {
       return;
     }
@@ -282,7 +522,7 @@ export function App() {
       setShowSettings(false);
       setSettingUpPassword(true);
     }
-  }, [isLocked, settings.lockPasswordHash]);
+  }, [isLocked, settings.lockPasswordHash, settingsReady]);
 
   const handleUnlock = useCallback(
     async (password: string): Promise<boolean> => {
@@ -300,21 +540,37 @@ export function App() {
     [settings.lockPasswordHash]
   );
 
-  const handleSavePassword = useCallback(
-    async (password: string) => {
-      const hashed = await hashPassword(password);
-      handleUpdateSettings({ lockPasswordHash: hashed });
-      setSettingUpPassword(false);
-      setIsLocked(true);
-    },
-    [handleUpdateSettings]
-  );
+  const handleSavePassword = useCallback(async (password: string) => {
+    if (!canPersistDomain(settingsLoadRef.current)) {
+      throw new Error("设置尚未加载完成，已取消保存");
+    }
+    const hashed = await hashPassword(password);
+    const next: AppSettings = { ...settingsRef.current, lockPasswordHash: hashed };
+    await invoke("save_settings", { settings: next });
+    setSettings(next);
+    setSettingUpPassword(false);
+    setIsLocked(true);
+  }, []);
 
   const handleHide = useCallback(() => {
     void invoke("hide_window");
   }, []);
 
   const noopMeasure = useCallback(() => {}, []);
+
+  const settleTilt = useCallback((animate: boolean) => {
+    if (tiltRafRef.current !== null) {
+      cancelAnimationFrame(tiltRafRef.current);
+      tiltRafRef.current = null;
+    }
+    const el = tiltCardRef.current;
+    if (!el || tiltSettledRef.current) return;
+    tiltSettledRef.current = true;
+    el.style.transition = animate
+      ? "transform 0.45s cubic-bezier(0.22, 1, 0.36, 1)"
+      : "none";
+    el.style.transform = TILT_REST;
+  }, []);
 
   const handleTiltMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -323,6 +579,15 @@ export function App() {
       }
       const el = tiltCardRef.current;
       if (!el) return;
+      const field = document.activeElement;
+      if (
+        field instanceof HTMLElement &&
+        (field.tagName === "INPUT" || field.tagName === "TEXTAREA") &&
+        el.contains(field)
+      ) {
+        settleTilt(true);
+        return;
+      }
       const clientX = e.clientX;
       const clientY = e.clientY;
       if (tiltRafRef.current !== null) {
@@ -330,24 +595,31 @@ export function App() {
       }
       tiltRafRef.current = requestAnimationFrame(() => {
         const rect = el.getBoundingClientRect();
-        const { rotateX, rotateY } = computeTiltAngles(clientX, clientY, rect, 12);
-        el.style.transition = "transform 90ms cubic-bezier(0.22, 1, 0.36, 1)";
-        el.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+        const { rotateX, rotateY } = computeTiltAngles(clientX, clientY, rect, TILT_MAX_DEG);
+        tiltSettledRef.current = false;
+        el.style.transition = "none";
+        el.style.transform = `perspective(${TILT_PERSPECTIVE}) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
       });
     },
-    []
+    [settleTilt]
   );
 
   const handleTiltMouseLeave = useCallback(() => {
-    if (tiltRafRef.current !== null) {
-      cancelAnimationFrame(tiltRafRef.current);
-      tiltRafRef.current = null;
-    }
-    const el = tiltCardRef.current;
-    if (!el) return;
-    el.style.transition = "transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)";
-    el.style.transform = "perspective(800px) rotateX(0deg) rotateY(0deg)";
-  }, []);
+    settleTilt(true);
+  }, [settleTilt]);
+
+  const handleTiltFocus = useCallback(
+    (e: React.FocusEvent<HTMLDivElement>) => {
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA")
+      ) {
+        settleTilt(true);
+      }
+    },
+    [settleTilt]
+  );
 
   const clearHideTimer = useCallback(() => {
     if (hideTimerRef.current !== null) {
@@ -367,7 +639,7 @@ export function App() {
 
   const probeAndMaybeHide = useCallback(async () => {
     if (
-      !loaded ||
+      !settingsReady ||
       !settings.edgeAutoHide ||
       isEdgeHidden ||
       showSettings ||
@@ -409,7 +681,7 @@ export function App() {
       // ignore transient errors
     }
   }, [
-    loaded,
+    settingsReady,
     settings.edgeAutoHide,
     isEdgeHidden,
     showSettings,
@@ -420,7 +692,7 @@ export function App() {
   const scheduleEdgeHideCheck = useCallback(() => {
     clearHideTimer();
     if (
-      !loaded ||
+      !settingsReady ||
       !settings.edgeAutoHide ||
       isEdgeHidden ||
       showSettings ||
@@ -433,7 +705,7 @@ export function App() {
     }, 420);
   }, [
     clearHideTimer,
-    loaded,
+    settingsReady,
     settings.edgeAutoHide,
     isEdgeHidden,
     showSettings,
@@ -469,7 +741,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!loaded || !settings.edgeAutoHide || isEdgeHidden || showSettings || settingUpPassword) {
+    if (!settingsReady || !settings.edgeAutoHide || isEdgeHidden || showSettings || settingUpPassword) {
       outsideSinceRef.current = null;
       return;
     }
@@ -478,7 +750,7 @@ export function App() {
     }, 300);
     return () => window.clearInterval(intervalId);
   }, [
-    loaded,
+    settingsReady,
     settings.edgeAutoHide,
     isEdgeHidden,
     showSettings,
@@ -496,13 +768,17 @@ export function App() {
       outsideSinceRef.current = null;
       setIsEdgeHidden(false);
     });
+    const onWindowFocus = () => setWindowFocused(true);
     const onWindowBlur = () => {
+      setWindowFocused(false);
       outsideSinceRef.current = Date.now();
       scheduleEdgeHideCheck();
     };
+    window.addEventListener("focus", onWindowFocus);
     window.addEventListener("blur", onWindowBlur);
     return () => {
       clearHideTimer();
+      window.removeEventListener("focus", onWindowFocus);
       window.removeEventListener("blur", onWindowBlur);
       void unlistenMoved.then((fn) => fn());
       void unlistenUnhide.then((fn) => fn());
@@ -515,29 +791,44 @@ export function App() {
     }
   }, [settings.edgeAutoHide, isEdgeHidden, handleUnhideFromEdge]);
 
-  const glassBackground =
-    resolvedTheme === "light"
-      ? `rgba(255, 255, 255, ${settings.opacity / 100})`
-      : `rgba(24, 24, 24, ${settings.opacity / 100})`;
+  const liveText = [todosSaveError, settingsSaveError, deletedRecord ? "已删除一条待办，可以撤销" : null]
+    .filter((part): part is string => Boolean(part))
+    .join("。");
+
+  const retryTodosSave = () => {
+    const snapshot = failedTodosRef.current;
+    if (snapshot) void persistTodos(snapshot);
+  };
+
+  const retrySettingsSave = () => {
+    const snapshot = failedSettingsRef.current;
+    if (!snapshot) return;
+    if (snapshot.launchAtStartup !== settingsRef.current.launchAtStartup) {
+      void commitLaunch(snapshot);
+      return;
+    }
+    void persistSettings(snapshot);
+  };
+
+  const focusFactor = windowFocused ? 1 : UNFOCUSED_OPACITY_FACTOR;
+  const shellAlpha = Math.min(1, Math.max(0, (settings.opacity / 100) * focusFactor));
+  const edgeChipBackground = `rgba(14, 18, 32, ${Math.max(0.35, shellAlpha * 0.62)})`;
 
   if (isEdgeHidden) {
     return (
       <div
         className="w-full h-full flex items-center justify-end bg-transparent"
         onMouseEnter={() => void handleUnhideFromEdge()}
-        onClick={() => void handleUnhideFromEdge()}
-        title="移入展开便利贴"
       >
-        <div
-          className="w-3.5 h-28 rounded-l-xl border-y border-l flex flex-col items-center justify-center gap-1.5 cursor-pointer shadow-lg"
+        <button
+          type="button"
+          aria-label="展开便利贴"
+          title="展开便利贴"
+          onClick={() => void handleUnhideFromEdge()}
+          className="interactive-btn w-3.5 h-28 rounded-l-xl border-y border-l flex flex-col items-center justify-center gap-1.5 cursor-pointer shadow-lg"
           style={{
-            backgroundColor:
-              resolvedTheme === "light"
-                ? "rgba(255, 255, 255, 0.72)"
-                : "rgba(30, 41, 59, 0.78)",
-            backdropFilter: "blur(16px)",
-            WebkitBackdropFilter: "blur(16px)",
-            borderColor: "rgba(37, 99, 235, 0.75)",
+            backgroundColor: edgeChipBackground,
+            borderColor: "rgba(255, 255, 255, 0.45)",
           }}
         >
           <span
@@ -552,6 +843,9 @@ export function App() {
               {activeCount}
             </span>
           )}
+        </button>
+        <div className="sr-only" role="status" aria-live="polite">
+          {liveText}
         </div>
       </div>
     );
@@ -571,46 +865,62 @@ export function App() {
     >
       <div
         ref={tiltCardRef}
+        onMouseEnter={() => setShellHot(true)}
         onMouseMove={handleTiltMouseMove}
-        onMouseLeave={handleTiltMouseLeave}
-        className="relative w-full h-full overflow-hidden rounded-2xl border"
+        onMouseLeave={() => {
+          setShellHot(false);
+          handleTiltMouseLeave();
+        }}
+        onFocus={handleTiltFocus}
+        className="relative w-full h-full overflow-hidden glass-shell-liquid"
         style={{
-          borderColor: "var(--border-window)",
-          boxShadow: "0 14px 32px rgba(0, 0, 0, 0.14)",
           transformStyle: "preserve-3d",
-          transform: "perspective(800px) rotateX(0deg) rotateY(0deg)",
-          willChange: "transform",
+          transform: TILT_REST,
         }}
       >
-      {/* Layer 1: Soft colorful shapes behind the frosted glass layer */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 overflow-hidden"
-        style={{ filter: "blur(36px)" }}
-      >
-        <div
-          className="absolute -top-10 -left-10 w-44 h-44 rounded-full"
-          style={{ backgroundColor: "rgba(96, 165, 250, 0.55)" }}
-        />
-        <div
-          className="absolute top-24 -right-8 w-40 h-40 rounded-full"
-          style={{ backgroundColor: "rgba(192, 132, 252, 0.48)" }}
-        />
-        <div
-          className="absolute -bottom-10 left-12 w-48 h-48 rounded-full"
-          style={{ backgroundColor: "rgba(52, 211, 153, 0.42)" }}
-        />
-      </div>
+      <>
+          <div className="liquid-veil" style={{ opacity: shellAlpha }} />
+          <div className="liquid-ambient" aria-hidden="true" style={{ opacity: shellAlpha }}>
+            <div
+              className="liquid-blob"
+              style={{
+                width: "58%",
+                height: "58%",
+                left: "-18%",
+                top: "-22%",
+                background:
+                  "radial-gradient(circle, rgba(84, 134, 255, 0.58) 0%, rgba(84, 134, 255, 0.32) 42%, rgba(84, 134, 255, 0.09) 72%, rgba(84, 134, 255, 0) 100%)",
+              }}
+            />
+            <div
+              className="liquid-blob"
+              style={{
+                width: "50%",
+                height: "50%",
+                left: "58%",
+                top: "6%",
+                background:
+                  "radial-gradient(circle, rgba(96, 238, 214, 0.47) 0%, rgba(96, 238, 214, 0.26) 42%, rgba(96, 238, 214, 0.08) 72%, rgba(96, 238, 214, 0) 100%)",
+              }}
+            />
+            <div
+              className="liquid-blob"
+              style={{
+                width: "62%",
+                height: "62%",
+                left: "-8%",
+                top: "42%",
+                background:
+                  "radial-gradient(circle, rgba(178, 120, 255, 0.41) 0%, rgba(178, 120, 255, 0.22) 42%, rgba(178, 120, 255, 0.07) 72%, rgba(178, 120, 255, 0) 100%)",
+              }}
+            />
+          </div>
+          <div className="liquid-specular" aria-hidden="true" style={{ opacity: shellAlpha }} />
+          <div className="liquid-sheen" aria-hidden="true" />
+          <div className="liquid-rim" aria-hidden="true" />
+        </>
 
-      {/* Layer 2: Frosted glass surface (rgba(255,255,255,0.15) + backdrop-filter: blur(16px)) */}
-      <div
-        className="relative z-10 w-full h-full flex flex-col"
-        style={{
-          backgroundColor: glassBackground,
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-        }}
-      >
+      <div className="relative z-10 w-full h-full flex flex-col">
         <TitleBar
           activeCount={activeCount}
           isLocked={isLocked}
@@ -623,6 +933,7 @@ export function App() {
 
         {isLocked ? (
           <LockOverlay
+            key="unlock"
             mode="unlock"
             onUnlock={handleUnlock}
             onSavePassword={handleSavePassword}
@@ -630,6 +941,7 @@ export function App() {
           />
         ) : settingUpPassword ? (
           <LockOverlay
+            key="setup"
             mode="setup"
             onUnlock={handleUnlock}
             onSavePassword={handleSavePassword}
@@ -637,39 +949,88 @@ export function App() {
           />
         ) : (
           <>
-            <TodoInput onAdd={handleAddTodo} />
+            <DataStatus
+              todosLoad={todosLoad}
+              settingsLoad={settingsLoad}
+              todosLoadError={todosLoadError}
+              settingsLoadError={settingsLoadError}
+              monitorsError={monitorsError}
+              onRetry={() => setLoadAttempt((attempt) => attempt + 1)}
+            />
 
-            {errorMsg && (
-              <div className="px-3 pb-2 shrink-0">
-                <div
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border caption-5"
-                  style={{
-                    backgroundColor: "var(--surface-popover)",
-                    borderColor: "var(--border-error)",
-                    color: "var(--text-error)",
-                  }}
-                >
-                  <WarningCircle size={14} className="shrink-0" />
-                  <span className="flex-1 break-words">{errorMsg}</span>
-                </div>
-              </div>
+            {todosReady && (
+              <TodoInput
+                value={draft}
+                onChange={setDraft}
+                onAdd={(content) => {
+                  if (!canPersistDomain(todosLoadRef.current)) return;
+                  handleAddTodo(content);
+                  setDraft("");
+                }}
+              />
             )}
 
-            {showSettings ? (
-              <div className="flex-1 min-h-0 overflow-y-auto sticky-scroll">
-                <SettingsPanel
-                  settings={settings}
-                  monitors={monitors}
-                  onUpdate={handleUpdateSettings}
-                  onRequestChangePassword={() => {
-                    setShowSettings(false);
-                    setSettingUpPassword(true);
-                  }}
-                  onClearPassword={() => handleUpdateSettings({ lockPasswordHash: null })}
-                  onClose={() => setShowSettings(false)}
-                />
+            {(todosSaveError || settingsSaveError) && (
+              <div className="px-3 pb-2 shrink-0 flex flex-col gap-2">
+                {todosSaveError && (
+                  <div
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border caption-5"
+                    style={{
+                      backgroundColor: "var(--surface-popover)",
+                      borderColor: "var(--border-error)",
+                      color: "var(--text-error)",
+                    }}
+                  >
+                    <WarningCircle size={14} className="shrink-0" />
+                    <span className="flex-1 break-words">{todosSaveError}</span>
+                    <button type="button" className="interactive-btn shrink-0" onClick={retryTodosSave}>
+                      重试
+                    </button>
+                  </div>
+                )}
+                {settingsSaveError && (
+                  <div
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg border caption-5"
+                    style={{
+                      backgroundColor: "var(--surface-popover)",
+                      borderColor: "var(--border-error)",
+                      color: "var(--text-error)",
+                    }}
+                  >
+                    <WarningCircle size={14} className="shrink-0" />
+                    <span className="flex-1 break-words">{settingsSaveError}</span>
+                    <button type="button" className="interactive-btn shrink-0" onClick={retrySettingsSave}>
+                      重试
+                    </button>
+                  </div>
+                )}
               </div>
-            ) : (
+            )}
+            <div className="sr-only" role="status" aria-live="polite">
+              {liveText}
+            </div>
+
+            {showSettings ? (
+              settingsReady ? (
+                <div id="settings-panel" className="flex-1 min-h-0 overflow-y-auto sticky-scroll">
+                  <SettingsPanel
+                    settings={settings}
+                    monitors={monitors}
+                    onUpdate={handleUpdateSettings}
+                    onRequestChangePassword={() => {
+                      setShowSettings(false);
+                      setSettingUpPassword(true);
+                    }}
+                    onClearPassword={() => handleUpdateSettings({ lockPasswordHash: null })}
+                    onClose={() => setShowSettings(false)}
+                  />
+                </div>
+              ) : (
+                <p className="px-3 pb-3 caption-5" style={{ color: "var(--text-secondary)" }}>
+                  设置表单已停用，避免把未加载的设置写回磁盘。
+                </p>
+              )
+            ) : todosReady ? (
               <>
                 <InfiniteTodoList
                   items={todos}
@@ -703,6 +1064,8 @@ export function App() {
                   </footer>
                 )}
               </>
+            ) : (
+              <div className="flex-1" />
             )}
           </>
         )}

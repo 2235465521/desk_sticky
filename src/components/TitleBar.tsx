@@ -78,6 +78,8 @@ export function TitleBar({
             onClick={onToggleSettings}
             title="设置"
             aria-label="设置"
+            aria-expanded={showSettings}
+            aria-controls="settings-panel"
             className="interactive-btn w-7 h-7 rounded-lg flex items-center justify-center"
             style={{
               backgroundColor: showSettings ? "var(--action-secondary-hover)" : "transparent",

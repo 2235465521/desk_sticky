@@ -80,7 +80,17 @@ export function InfiniteTodoList({
   }, [loopEnabled, segmentHeight, editingTarget]);
 
   const handleStartEdit = useCallback((id: string, segmentKey: string) => {
-    setEditingTarget({ id, segmentKey });
+    setEditingTarget({ id, segmentKey: "seg-b" });
+    if (segmentKey === "seg-b") return;
+    requestAnimationFrame(() => {
+      const container = containerRef.current;
+      const primary = primarySegmentRef.current;
+      if (!container || !primary) return;
+      const row = primary.querySelector<HTMLElement>(`[data-todo-id="${CSS.escape(id)}"]`);
+      if (!row) return;
+      const delta = row.getBoundingClientRect().top - container.getBoundingClientRect().top;
+      container.scrollTop += delta;
+    });
   }, []);
 
   const handleCommitEdit = useCallback(
@@ -141,6 +151,7 @@ export function InfiniteTodoList({
           onCancelEdit={handleCancelEdit}
           onToggleComplete={onToggleComplete}
           onDelete={onDelete}
+          tabbable={isPrimary}
         />
       ))}
     </div>
