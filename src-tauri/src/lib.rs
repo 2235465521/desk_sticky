@@ -1,3 +1,4 @@
+mod env_check;
 mod storage;
 mod win32_window;
 
@@ -327,6 +328,10 @@ fn show_main_window(app: &AppHandle) {
 }
 
 pub fn run() {
+    if !env_check::ensure_webview2_or_prompt() {
+        return;
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
