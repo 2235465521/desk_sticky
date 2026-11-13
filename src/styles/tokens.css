@@ -1,0 +1,200 @@
+/* ==========================================================================
+   Design Tokens — derived from figma-designer & landing-page-design skills
+   ========================================================================== */
+
+:root {
+  /* Typography */
+  --font-sans: "Geist", "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", sans-serif;
+  --font-mono: "Geist Mono", "Cascadia Mono", monospace;
+
+  /* Spacing (Spacing-0 .. Spacing-400) */
+  --spacing-0: 0px;
+  --spacing-25: 2px;
+  --spacing-50: 4px;
+  --spacing-75: 8px;
+  --spacing-100: 12px;
+  --spacing-200: 16px;
+  --spacing-300: 24px;
+  --spacing-400: 32px;
+
+  /* Corner Radius */
+  --radius-0: 0px;
+  --radius-2: 2px;
+  --radius-4: 4px;
+  --radius-6: 6px;
+  --radius-8: 8px;
+  --radius-12: 12px;
+  --radius-16: 16px;
+  --radius-full: 9999px;
+
+  /* Motion */
+  --ease-decel: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-hover: 180ms;
+  --duration-color: 220ms;
+  --duration-layout: 320ms;
+
+  /* Core Colors — Layer 1 */
+  --core-grayscale-00: #ffffff;
+  --core-grayscale-50: #f4f4f5;
+  --core-grayscale-100: #e4e4e7;
+  --core-grayscale-150: #d4d4d8;
+  --core-grayscale-200: #a1a1aa;
+  --core-grayscale-300: #71717a;
+  --core-grayscale-400: #52525b;
+  --core-grayscale-500: #3f3f46;
+  --core-grayscale-600: #3a3a3d;
+  --core-grayscale-700: #363638;
+  --core-grayscale-750: #313131;
+  --core-grayscale-800: #272727;
+  --core-grayscale-850: #1f1f1f;
+  --core-grayscale-870: #181818;
+  --core-grayscale-1000: #000000;
+
+  --core-primary-350: #93c5fd;
+  --core-primary-400: #60a5fa;
+  --core-primary-500: #3b82f6;
+  --core-primary-600: #2563eb;
+  --core-primary-700: #1d4ed8;
+
+  --core-red-400: #f87171;
+  --core-red-500: #ef4444;
+  --core-red-700: #b91c1c;
+
+  --core-green-400: #4ade80;
+  --core-green-500: #22c55e;
+  --core-green-600: #16a34a;
+
+  --core-yellow-300: #fde047;
+  --core-yellow-500: #eab308;
+
+  --core-alpha-dark-16: rgba(255, 255, 255, 0.08);
+  --core-alpha-dark-24: rgba(255, 255, 255, 0.13);
+  --core-alpha-dark-40: rgba(255, 255, 255, 0.2);
+
+  --core-alpha-light-16: rgba(24, 24, 27, 0.05);
+  --core-alpha-light-24: rgba(24, 24, 27, 0.09);
+  --core-alpha-light-40: rgba(24, 24, 27, 0.16);
+}
+
+/* Color System — Layer 2 (Dark Mode) */
+[data-theme="dark"] {
+  --border-window: rgba(255, 255, 255, 0.28);
+  --border-primary: rgba(255, 255, 255, 0.14);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-action-primary: var(--core-primary-400);
+  --border-error: var(--core-red-400);
+
+  --surface-card: rgba(39, 39, 39, 0.42);
+  --surface-card-hover: rgba(49, 49, 49, 0.72);
+  --surface-card-completed: rgba(59, 130, 246, 0.26);
+  --border-card-completed: rgba(96, 165, 250, 0.62);
+  --text-completed: #93c5fd;
+  --surface-input: rgba(31, 31, 31, 0.56);
+  --surface-input-focus: rgba(31, 31, 31, 0.82);
+  --surface-popover: rgba(24, 24, 24, 0.94);
+
+  --action-primary: var(--core-primary-500);
+  --action-primary-hover: var(--core-primary-600);
+  --action-secondary: rgba(255, 255, 255, 0.08);
+  --action-secondary-hover: rgba(255, 255, 255, 0.14);
+  --action-danger-hover: rgba(239, 68, 68, 0.18);
+
+  --text-primary: var(--core-grayscale-50);
+  --text-secondary: var(--core-grayscale-200);
+  --text-tertiary: #8e8e93;
+  --text-inverted: var(--core-grayscale-00);
+  --text-error: var(--core-red-400);
+  --text-info: var(--core-primary-350);
+
+  --icon-default: var(--core-grayscale-50);
+  --icon-secondary: var(--core-grayscale-200);
+  --icon-subtle: #8e8e93;
+  --icon-error: var(--core-red-400);
+  --icon-success: var(--core-green-400);
+
+  --shadow-card-hover: 0 6px 18px rgba(0, 0, 0, 0.34);
+  --shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.48);
+}
+
+/* Color System — Layer 2 (Light Mode) */
+[data-theme="light"] {
+  --border-window: rgba(255, 255, 255, 0.52);
+  --border-primary: rgba(255, 255, 255, 0.55);
+  --border-subtle: rgba(255, 255, 255, 0.48);
+  --border-action-primary: var(--core-primary-500);
+  --border-error: var(--core-red-500);
+
+  --surface-card: rgba(255, 255, 255, 0.72);
+  --surface-card-hover: rgba(255, 255, 255, 0.9);
+  --surface-card-completed: rgba(219, 234, 254, 0.85);
+  --border-card-completed: rgba(37, 99, 235, 0.78);
+  --text-completed: #1d4ed8;
+  --surface-input: rgba(255, 255, 255, 0.54);
+  --surface-input-focus: rgba(255, 255, 255, 0.86);
+  --surface-popover: rgba(255, 255, 255, 0.9);
+
+  --action-primary: var(--core-primary-500);
+  --action-primary-hover: var(--core-primary-600);
+  --action-secondary: rgba(255, 255, 255, 0.38);
+  --action-secondary-hover: rgba(255, 255, 255, 0.62);
+  --action-danger-hover: rgba(239, 68, 68, 0.14);
+
+  --text-primary: var(--core-grayscale-870);
+  --text-secondary: var(--core-grayscale-500);
+  --text-tertiary: var(--core-grayscale-400);
+  --text-inverted: var(--core-grayscale-00);
+  --text-error: var(--core-red-500);
+  --text-info: var(--core-primary-600);
+
+  --icon-default: var(--core-grayscale-870);
+  --icon-secondary: var(--core-grayscale-500);
+  --icon-subtle: var(--core-grayscale-400);
+  --icon-error: var(--core-red-500);
+  --icon-success: var(--core-green-600);
+
+  --shadow-card-hover: 0 6px 18px rgba(15, 23, 42, 0.12);
+  --shadow-popover: 0 12px 32px rgba(15, 23, 42, 0.16);
+}
+
+/* Named Text Styles */
+.title-4 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.body-5 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.body-6 {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.button-sm {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.button-xsm {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+}
+
+.caption-4 {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+.caption-5 {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+}
