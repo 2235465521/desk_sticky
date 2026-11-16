@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="description" content="DeskSticky 当前仓库的架构、缺陷、风险和实施建议静态审查。">
+<title>DeskSticky 项目完整审查报告 · 2026-11-13</title>
+<style>
+:root{--ink:#182631;--muted:#53616c;--line:#d2dbe0;--paper:#fff;--page:#f3f5f6;--accent:#185973;--accent-soft:#eaf3f6;--p1:#8b281f;--p1-bg:#faeeeb;--p2:#70460c;--p2-bg:#f8f0df;--p3:#435669;--p3-bg:#edf1f5}
+*{box-sizing:border-box}
+html{scroll-padding-top:24px}
+body{margin:0;background:var(--page);color:var(--ink);font:16px/1.8 "Segoe UI","Microsoft YaHei","PingFang SC",sans-serif}
+a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:3px}
+a:hover{text-decoration-thickness:2px}
+a:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+.skip{position:absolute;left:12px;top:-80px;padding:8px 16px;background:var(--paper);z-index:10}
+.skip:focus{top:12px}
+.shell{max-width:1440px;margin:auto;display:grid;grid-template-columns:226px minmax(0,1fr);align-items:start}
+aside{position:sticky;top:0;max-height:100vh;overflow:auto;padding:38px 20px 30px 24px}
+.brand{font-size:20px;font-weight:750;letter-spacing:.02em;margin-bottom:3px}
+.side-note{font-size:13px;line-height:1.7;color:var(--muted)}
+nav{margin-top:28px}
+nav a{display:flex;align-items:center;min-height:44px;font-size:14px;padding:6px 0;text-decoration:none;border-bottom:1px solid var(--line)}
+.side-meta{border-top:2px solid var(--accent);margin-top:28px;padding-top:14px;font-size:12px;color:var(--muted)}
+main{min-width:0;padding:46px 56px 60px;background:var(--paper);border-left:1px solid var(--line)}
+.eyebrow{font-size:12px;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);font-weight:700;margin:0 0 12px}
+h1{font-size:32px;line-height:1.35;letter-spacing:-.02em;margin:0 0 16px}
+.lede{font-size:18px;line-height:1.8;max-width:48em;margin:0 0 20px}
+.meta{display:flex;gap:6px 22px;flex-wrap:wrap;font-size:13px;color:var(--muted);padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+section{padding-top:38px}
+h2{font-size:23px;line-height:1.45;margin:0 0 18px;padding-bottom:10px;border-bottom:2px solid var(--accent)}
+h2 .section-no{font:600 13px/1 ui-monospace,Consolas,monospace;color:var(--accent);margin-right:12px}
+h3{font-size:19px;line-height:1.55;margin:24px 0 10px}
+h4{font-size:16px;margin:20px 0 8px}
+p{margin:10px 0 14px}
+ul,ol{margin:10px 0 16px;padding-left:24px}
+li{margin:5px 0}
+code,.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace}
+code{font-size:.88em;overflow-wrap:anywhere}
+pre{padding:18px;background:#f3f6f7;border:1px solid var(--line);overflow:auto;line-height:1.65}
+pre code{font-size:13px;overflow-wrap:normal}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:15px 20px;margin:20px 0}
+.callout p:first-child{margin-top:0}
+.callout p:last-child{margin-bottom:0}
+.warning{border-left-color:var(--p1);background:var(--p1-bg)}
+.counts{display:flex;gap:0;flex-wrap:wrap;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:24px 0}
+.count{flex:1 1 140px;padding:16px 18px 16px 0}
+.count+.count{border-left:1px solid var(--line);padding-left:18px}
+.count strong{display:block;font:700 27px/1.25 ui-monospace,Consolas,monospace;color:var(--ink)}
+.count span{font-size:13px;color:var(--muted)}
+.priority{display:inline-block;vertical-align:middle;padding:1px 7px;border-radius:3px;font:bold 12px/1.8 ui-monospace,Consolas,monospace;white-space:nowrap}
+.p1{background:var(--p1-bg);color:var(--p1)}.p2{background:var(--p2-bg);color:var(--p2)}.p3{background:var(--p3-bg);color:var(--p3)}
+.table-wrap{overflow-x:auto;margin:16px 0 22px;border:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.7}
+caption{text-align:left;padding:12px 14px;font-weight:700;background:#f0f4f5}
+th,td{text-align:left;vertical-align:top;padding:12px 14px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+th{font-size:13px;background:#f5f7f8;font-weight:700}
+tbody tr:last-child td{border-bottom:0}
+.summary-table td:first-child,.summary-table td:nth-child(2){white-space:nowrap;width:58px}
+.summary-table td:nth-child(4){width:125px}
+.architecture{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:22px 0}
+.arch-node{border-top:3px solid var(--accent);border-bottom:1px solid var(--line);padding:14px 0 16px}
+.arch-node strong{display:block;margin-bottom:7px}
+.arch-node p{font-size:13px;line-height:1.75;margin:0}
+.flow{font-family:ui-monospace,Consolas,monospace;font-size:13px;color:var(--accent)}
+.state-map{display:grid;grid-template-columns:1fr 1fr;gap:14px 30px}
+.state-map div{border-top:1px solid var(--line);padding:13px 0}
+.state-map strong{display:block}
+.state-map p{font-size:14px;margin:4px 0}
+.finding{padding:25px 0 20px;border-top:1px solid var(--line);scroll-margin-top:24px}
+.finding:first-of-type{border-top:0}
+.finding-top{display:flex;align-items:center;gap:12px;font-size:13px}
+.finding h3{margin:10px 0 12px}
+.evidence-line{font-size:12px;line-height:2;color:var(--muted);overflow-wrap:anywhere}
+.finding-body{display:grid;grid-template-columns:85px minmax(0,1fr);gap:9px 14px;margin:14px 0}
+.finding-body dt{font-weight:700;font-size:14px}
+.finding-body dd{margin:0;font-size:14px}
+.confidence{font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:9px}
+.phase{padding:10px 0 16px;border-bottom:1px solid var(--line)}
+.phase:last-child{border-bottom:0}
+.phase h3{margin-top:12px}
+details{margin:14px 0;border:1px solid var(--line);padding:0 16px}
+summary{cursor:pointer;min-height:48px;display:list-item;align-content:center;font-weight:650;font-size:14px;padding:10px 0}
+details>*:not(summary){font-size:14px}
+footer{border-top:2px solid var(--accent);margin-top:40px;padding-top:16px;font-size:12px;color:var(--muted)}
+@media(max-width:1120px){main{padding:36px 30px 48px}.shell{grid-template-columns:200px minmax(0,1fr)}aside{padding-left:20px}.architecture{grid-template-columns:1fr}.arch-node{padding:12px 0}.state-map{grid-template-columns:1fr}}
+@media(max-width:760px){body{font-size:15px}.shell{display:block}aside{position:static;max-height:none;padding:22px 20px 14px}nav{display:flex;flex-wrap:wrap;gap:0 16px;margin-top:12px}nav a{font-size:13px;border:0}.side-meta{display:none}.brand{font-size:19px}main{padding:26px 20px 38px;border-left:0;border-top:1px solid var(--line)}h1{font-size:26px}.lede{font-size:16px}h2{font-size:21px}section{padding-top:30px}.count{flex-basis:45%}.count:nth-child(3){border-left:0;padding-left:0}.finding-body{grid-template-columns:1fr;gap:3px}.finding-body dd{margin-bottom:10px}th,td{padding:10px}.summary-table td:nth-child(4),.summary-table th:nth-child(4){display:none}.meta{gap:5px 14px}.callout{padding:13px 15px}}
+@media print{@page{size:A4;margin:17mm 15mm}body{background:#fff;font-size:10pt;line-height:1.65}.shell{display:block;max-width:none}aside,.skip{display:none}main{border:0;padding:0}h1{font-size:24pt}h2{font-size:16pt;break-after:avoid}h3{font-size:12pt;break-after:avoid}section{padding-top:20px}a{color:inherit;text-decoration:none}.meta,.evidence-line,.confidence,.small{font-size:8.5pt}.counts{break-inside:avoid}.count strong{font-size:20pt}.table-wrap{overflow:visible}table{font-size:9pt}tr{break-inside:avoid}thead{display:table-header-group}.finding{padding:16px 0}.finding-top{break-after:avoid}.finding-body{display:block}.finding-body dt{font-size:9.5pt;margin-top:8px;break-after:avoid}.finding-body dd{font-size:9.5pt}pre{white-space:pre-wrap;overflow-wrap:anywhere;overflow:visible}details{border:0;padding:0}details>summary{display:none}details>*:not(summary){display:block!important}.architecture,.state-map{display:block}.arch-node{break-inside:avoid}.callout{break-inside:avoid}footer{font-size:8pt}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">跳到报告正文</a>
+<div class="shell">
+<aside aria-label="报告导航">
+<div class="brand">DeskSticky</div>
+<div class="side-note">项目完整审查报告<br>静态源码审查 · 2026-11-13</div>
+<nav aria-label="章节">
+<a href="#verdict">01 审查结论</a>
+<a href="#scope">02 范围与证据边界</a>
+<a href="#architecture">03 架构与数据流</a>
+<a href="#features">04 功能与声明核对</a>
+<a href="#ui-motion">05 界面设计与动画效果</a>
+<a href="#findings">06 发现与处理建议</a>
+<a href="#risks">07 架构及安全风险</a>
+<a href="#verification">08 验证缺口与验收</a>
+<a href="#roadmap">09 实施顺序</a>
+<a href="#appendix">10 覆盖与参考资料</a>
+</nav>
+<div class="side-meta">基线提交<br><code>830e16b1bcb6</code><br><br>本文件可离线阅读。<br>使用浏览器打印可保存 PDF。<br>正文中的源码链接指向仓库相对路径，行号写在链接文字中。</div>
+</aside>
+<main id="main">
+<header>
+<p class="eyebrow">DESKSTICKY / REPOSITORY REVIEW</p>
+<h1>项目完整审查报告</h1>
+<p class="lede">项目已具备便利贴的主要功能骨架，但加载失败后的写入控制、密码表单切换和跨层状态同步存在明确缺陷。建议先处理两项 P1，并完成故障注入与 Windows 实机验证，再据此判断是否适合对外发布。</p>
+<div class="meta"><span>审查日期：2026-11-13（Asia/Shanghai）</span><span>版本：0.1.0</span><span>分支：main</span><span>方法：只读静态审查 + 官方资料核对</span></div>
+</header>
+
+<section id="verdict">
+<h2><span class="section-no">01</span>审查结论</h2>
+<div class="callout warning"><p><strong>发布建议：先修复高优先级缺陷，当前不足以给出发布通过结论。</strong></p><p>最直接的风险是“保存并锁定”后仍可直接解锁，以及加载失败后继续保存可能覆盖原有数据。现有测试集中在几何、滚动和倾斜计算，无法证明这些跨组件、跨 IPC 的用户流程可靠。</p></div>
+<div class="counts" aria-label="静态审查发现数量">
+<div class="count"><strong>2</strong><span>P1 · 核心保护或数据风险</span></div>
+<div class="count"><strong>10</strong><span>P2 · 功能与可访问性缺陷</span></div>
+<div class="count"><strong>4</strong><span>P3 · 维护及体验问题</span></div>
+<div class="count"><strong>16</strong><span>现有测试用例，均未执行</span></div>
+</div>
+<p>共记录 16 项有明确代码证据的发现，其中 F13–F16 为本次界面设计与可访问性补充；完整动效盘点见第五章。P1 建议在继续分发前处理；P2 应纳入近期修复；P3 随质量整理处理。没有确认 P0，但这不代表排除了全部严重风险。设计建议、条件性加固和未实测事项不计入这 16 项。</p>
+<p>另列发布前必须闭环的交付缺口 <a href="#D01">D01：干净电脑安装的依赖分发方案与验收尚未落实</a>，附具体修改位置、局部配置建议和验收矩阵。它不计入上述源码缺陷统计。</p>
+<div class="table-wrap"><table class="summary-table"><caption>发现索引，点击编号可跳转到完整证据与建议</caption><thead><tr><th scope="col">编号</th><th scope="col">级别</th><th scope="col">发现</th><th scope="col">所属范围</th></tr></thead><tbody><tr><td><a href="#F01">F01</a></td><td><span class="priority p1">P1</span></td><td><a href="#F01">保存并锁定后残留有效密码，可直接再次解锁</a></td><td>密码锁</td></tr>
+<tr><td><a href="#F02">F02</a></td><td><span class="priority p1">P1</span></td><td><a href="#F02">加载未完成或加载失败后仍可保存默认快照，存在覆盖原数据的路径</a></td><td>数据可靠性</td></tr>
+<tr><td><a href="#F03">F03</a></td><td><span class="priority p2">P2</span></td><td><a href="#F03">密码设置没有等待落盘成功，失败后仍进入锁屏并隐藏错误</a></td><td>密码与持久化</td></tr>
+<tr><td><a href="#F04">F04</a></td><td><span class="priority p2">P2</span></td><td><a href="#F04">不相关的保存成功会清除尚未恢复的失败提示</a></td><td>错误恢复</td></tr>
+<tr><td><a href="#F05">F05</a></td><td><span class="priority p2">P2</span></td><td><a href="#F05">贴边收起会卸载输入组件，丢失未提交草稿</a></td><td>交互与草稿</td></tr>
+<tr><td><a href="#F06">F06</a></td><td><span class="priority p2">P2</span></td><td><a href="#F06">自启动设置与注册表更新分裂，界面状态可能与系统相反</a></td><td>系统设置一致性</td></tr>
+<tr><td><a href="#F07">F07</a></td><td><span class="priority p2">P2</span></td><td><a href="#F07">显示器移除后的恢复仅改窗口几何，没有同步收起状态</a></td><td>原生窗口状态</td></tr>
+<tr><td><a href="#F08">F08</a></td><td><span class="priority p2">P2</span></td><td><a href="#F08">两种背景模糊模式只有选中状态变化，没有实际模式差异</a></td><td>功能真实性</td></tr>
+<tr><td><a href="#F09">F09</a></td><td><span class="priority p2">P2</span></td><td><a href="#F09">无限列表的隐藏克隆仍可聚焦，编辑输入脱离可访问树</a></td><td>键盘与辅助技术</td></tr>
+<tr><td><a href="#F10">F10</a></td><td><span class="priority p3">P3</span></td><td><a href="#F10">把保存和系统操作放在 React updater 内，开发时会重复副作用</a></td><td>状态管理</td></tr>
+<tr><td><a href="#F11">F11</a></td><td><span class="priority p3">P3</span></td><td><a href="#F11">减少动态效果规则没有覆盖流光伪元素和撒花粒子</a></td><td>可访问性</td></tr>
+<tr><td><a href="#F12">F12</a></td><td><span class="priority p3">P3</span></td><td><a href="#F12">README 声明 Node.js 18+，锁定的构建依赖要求 Node.js 20+</a></td><td>开发与交付</td></tr>
+<tr><td><a href="#F13">F13</a></td><td><span class="priority p2">P2</span></td><td><a href="#F13">默认主色按钮的小号白字对比度不足</a></td><td>文字与色彩</td></tr>
+<tr><td><a href="#F14">F14</a></td><td><span class="priority p2">P2</span></td><td><a href="#F14">设置控件的名称和选中状态没有完整暴露给辅助技术</a></td><td>表单语义</td></tr>
+<tr><td><a href="#F15">F15</a></td><td><span class="priority p2">P2</span></td><td><a href="#F15">贴边收起条没有直接的键盘展开操作</a></td><td>键盘入口</td></tr>
+<tr><td><a href="#F16">F16</a></td><td><span class="priority p3">P3</span></td><td><a href="#F16">保存错误、密码错误和删除提示缺少可靠的自动播报</a></td><td>状态反馈</td></tr>
+</tbody></table></div>
+<p>有利基础是：技术栈与 Windows 常驻工具的目标一致；原生几何计算已有可单独审查的纯函数；JSON 替换写入避免了直接截断正式文件；存储错误通常会返回调用者；React 文本插值没有引入显式 HTML 注入入口。这些基础值得保留，现阶段不需要引入服务端或大规模框架重写。</p>
+</section>
+
+<section id="scope">
+<h2><span class="section-no">02</span>范围与证据边界</h2>
+<p>审查目标是 <code>D:\code_files\desk_stick</code> 当前工作树，基线为 <code>830e16b1bcb6d58ce7fffbe1326519b285211461</code>。开始审查时 Git 工作树干净，只有一个可见提交，提交时间为 2026-11-13 10:04:05 +08:00。此次按整个仓库审查，并非仅检查一个提交的差异。</p>
+<ul>
+<li>纳入 39 个跟踪文件：26 个 TypeScript/TSX/Rust/CSS 源文件共 3,970 行（含测试与空行），其余为说明、配置、两份锁文件及 3 个图标资源。20 个 <code>src</code> 文件与全部 Rust 自有源码均完成静态阅读。</li>
+<li>使用 Superpowers 的并行审查流程，将前端、持久化/密码边界、Win32 窗口作为独立域复核，主审再检查调用链、边界和误报。对不确定的 React、Tauri 与 Win32 行为查阅官方资料。</li>
+<li>依照用户授权，只新增本 HTML 文档。未修改代码或配置，未安装依赖，未执行项目测试、构建或应用，未写注册表，未读取实际用户的待办、密码配置或其他个人数据。</li>
+<li>审查时未发现 <code>node_modules</code>、<code>dist</code>、<code>src-tauri/target</code>；PATH 中未发现 <code>cargo</code>/<code>rustc</code>，Node 为 <code>v24.14.1</code>。这是本次环境观察，不代表机器其他位置没有 Rust 工具链。</li>
+</ul>
+<div class="callout"><p><strong>报告中的“源码可确定”指代码路径和框架规则支持该结论；不等同于已经运行复现。</strong>所有应用测试、编译、安装包验证和真实 Windows 场景均未执行。文档提供的复现步骤与命令属于后续验证方案，需要获得对应执行授权。</p></div>
+<p class="small muted">本次不提供覆盖率、耗时、内存、帧率或漏洞扫描通过率，也不宣称项目当前一定能构建或一定不能构建。未对全部传递依赖做实时漏洞数据库扫描；锁文件存在不等于依赖安全已获证明。图标仅检查清单和引用，未审美或逐像素验证。</p>
+<p class="small muted">文档验收边界：本 HTML 不依赖 JavaScript、外部字体或 CDN。内置浏览器安全策略拒绝本地 file: 页面，因而未完成渲染、真实点击、移动布局和打印视觉验收；文档通过离线解析检查结构、锚点和源码引用，不将源码检查冒充浏览器验收。</p>
+</section>
+
+<section id="architecture">
+<h2><span class="section-no">03</span>架构与数据流</h2>
+<p>这是一个单窗口、本地优先的 Windows 应用。React 在 WebView2 中管理界面与大部分业务状态，通过 Tauri IPC 调用 Rust。Rust 负责 JSON 文件、注册表、托盘、单实例和 HWND 操作，没有项目自有的远端服务、数据库或联网业务路径。</p>
+<div class="architecture" aria-label="架构：React 界面通过 Tauri IPC 调用 Rust，Rust 访问本地 JSON 与 Windows。原生事件通过 Tauri 回传界面。">
+<div class="arch-node"><strong>React / WebView2</strong><p><code>App.tsx</code> 总控<br>待办、设置、密码遮罩、撤销<br>草稿与编辑组件、A/B/C 循环列表<br>主题、CSS 玻璃效果和动画</p><p class="flow">invoke → Rust<br>← listen / emit</p></div>
+<div class="arch-node"><strong>Tauri / Rust 应用层</strong><p><code>lib.rs</code>，12 个 command<br>RuntimeState + Mutex<br>启动 setup、托盘与单实例<br>显示变化与窗口事件协调</p><p class="flow">storage / win32_window →</p></div>
+<div class="arch-node"><strong>本地系统边界</strong><p><code>todos.json / settings.json</code><br>HKCU Run 自启动项<br>Win32 HWND / DWM / DPI / 监视器<br>前台事件 hook 与显示变化线程</p><p class="flow">WM / hook → main thread → UI</p></div>
+</div>
+<div class="table-wrap"><table><caption>模块职责与当前边界</caption><thead><tr><th scope="col">模块</th><th scope="col">实际职责</th><th scope="col">评估</th></tr></thead><tbody>
+<tr><td><a href="../src/App.tsx"><code>src/App.tsx:29–713</code></a></td><td>加载、todos/settings 状态、整量保存、撤销、密码、托盘监听、窗口布局、边缘轮询和倾斜效果。</td><td>715 行中集中太多异步与生命周期职责，是缺陷最密集的协调点。</td></tr>
+<tr><td><a href="../src/components/InfiniteTodoList.tsx"><code>src/components/InfiniteTodoList.tsx:20–166</code></a></td><td>测量高度，按需渲染三份完整条目并包装 scrollTop；编辑状态记录 id 与 segmentKey。</td><td>是 DOM 复制循环，不是虚拟列表；焦点与编辑生命周期需要额外设计。</td></tr>
+<tr><td><a href="../src/components/TodoInput.tsx"><code>src/components/TodoInput.tsx:8–97</code></a><br><a href="../src/components/TodoItemRow.tsx"><code>src/components/TodoItemRow.tsx:17–204</code></a></td><td>分别保存新增和行内编辑草稿；处理 IME、Enter、Shift+Enter、Escape、blur 和庆祝效果。</td><td>局部状态易理解，但 App 更换整棵主树时会丢失未提交状态。</td></tr>
+<tr><td><a href="../src-tauri/src/lib.rs"><code>src-tauri/src/lib.rs:24–29</code></a></td><td>缓存设置、逻辑高度、是否收起和收起前 top；注册 IPC、原生事件及托盘。</td><td>既有命令层又有窗口控制器；同一状态转换存在多条实现路径。</td></tr>
+<tr><td><a href="../src-tauri/src/storage.rs"><code>src-tauri/src/storage.rs:50–88</code></a></td><td>读 JSON 或默认值；写同目录临时文件后 rename；分开保存 todos 和 settings。</td><td>足够支持小规模本地工具，但失败恢复、版本与耐久语义不完整。</td></tr>
+<tr><td><a href="../src-tauri/src/win32_window.rs"><code>src-tauri/src/win32_window.rs:49–242</code></a><br><a href="../src-tauri/src/win32_window.rs"><code>src-tauri/src/win32_window.rs:292–677</code></a></td><td>纯几何、显示器枚举、无边框 subclass、窗口矩形、背景策略、Win+D hook、显示 watcher。</td><td>已将原生细节隔离；纯计算可测试，真实副作用缺少可靠的错误反馈和集成证据。</td></tr>
+</tbody></table></div>
+<h3>四条关键状态链</h3>
+<div class="state-map">
+<div><strong>待办</strong><p>磁盘 JSON → load_app_state → React todos。用户操作先改 React，再 fire-and-forget 保存完整快照。Rust 不保存待办业务状态，没有待保存版本和失败恢复记录。</p></div>
+<div><strong>设置</strong><p>React settings、Rust Mutex、settings.json、注册表和 HWND 实际状态共同参与。当前把持久化和系统副作用分开发出，没有一个统一的生效确认点。</p></div>
+<div><strong>贴边与可见性</strong><p>React isEdgeHidden、Rust is_edge_hidden/pre_hide_top 与 HWND 几何分别维护。300ms 轮询探测鼠标，满足条件后收起；托盘和显示变化也可改变窗口，容易产生状态分叉。</p></div>
+<div><strong>密码锁</strong><p>密码在前端经固定前缀 + 单次 SHA-256 得到 hash；hash 随 settings 保存。解锁验证、锁定标志和内容遮罩都在 React。重启读取到 hash 后会进入锁屏。</p></div>
+</div>
+<h3>线程与生命周期</h3>
+<p><code>save_todos</code>、<code>save_settings</code> 等都是同步 Tauri command。按官方执行模型，默认在主线程处理，因此整量序列化、磁盘写入和注册表访问可能占用 UI 调度；这是需要测量的性能风险，不是本次已经测出的卡顿。<a href="https://v2.tauri.app/develop/calling-rust/" rel="noreferrer">Tauri command 执行模型</a>。</p>
+<p>显示 watcher 在独立线程创建隐藏窗口与消息循环，再通过 <code>run_on_main_thread</code> 修改应用窗口；WinEvent hook 在安装线程接收事件。这种线程划分总体合理。hook/watch 句柄没有统一主动停止机制，若以后支持重初始化或多窗口，应建立生命周期所有权；当前进程级单次初始化不足以直接判为资源泄漏。</p>
+</section>
+
+<section id="features">
+<h2><span class="section-no">04</span>功能与声明核对</h2>
+<div class="table-wrap"><table><caption>README 与源码对照；“已有实现”均不表示已实机验收</caption><thead><tr><th scope="col">功能</th><th scope="col">源码支持</th><th scope="col">差距或验证要求</th></tr></thead><tbody>
+<tr><td>待办新增、编辑、完成、删除与撤销</td><td>App 处理数据；输入与行组件包含 Enter、Shift+Enter、IME 和 blur 路径。</td><td>加载/保存失败、未提交草稿与跨分支生命周期有 F02–F05。清理完成项立即保存，没有批量撤销，是否需要保护由产品策略决定。</td></tr>
+<tr><td>无限循环滚动</td><td>溢出时复制 A/B/C 三段并调整 scrollTop；已有滚动纯函数测试。</td><td>复制导致焦点语义问题 F09；大量条目的 DOM/动画成本尚未测量。稳定滚动工具函数被测试，但没有接入真实列表。</td></tr>
+<tr><td>玻璃质感、圆角、倾斜与流光</td><td>CSS backdrop-filter、内部色块、3D transform 和伪元素动画；Win32 去掉原生框架。</td><td>两种模糊模式无差异 F08。当前 CSS 玻璃效果不能作为已验证的原生桌面背景模糊兼容证明。</td></tr>
+<tr><td>密码锁</td><td>hash 保存和 React 内容遮罩；已有密码时启动后锁定。</td><td>F01 可直接破坏设置后的锁定；F03 使密码保存状态失真。README 承诺的是遮罩，不是待办加密。</td></tr>
+<tr><td>贴边收起/移入展开</td><td>鼠标探测、计时、物理 peek/restore 几何与前端分支切换。</td><td>草稿丢失 F05；拓扑恢复状态分叉 F07；隐藏/展开的失败处理和异步事件顺序应补测试。</td></tr>
+<tr><td>跨屏与跨 DPI</td><td>工作区、负坐标、scale_factor、ScaleFactorChanged 回调和恢复纯函数。</td><td>真实混合 DPI、原地修改缩放、工作区变化和事件顺序未验收，不能由纯函数测试替代。</td></tr>
+<tr><td>Win+D 后保持可见</td><td>前台事件 hook 识别 Progman/WorkerW，再恢复显示和 Z 序。</td><td>依赖 Shell 行为；第二次 Win+D、任务栏显示桌面、Explorer 重启和 Windows 10/11 都需要实测。</td></tr>
+<tr><td>托盘与单实例</td><td>Tauri single-instance 插件；托盘显示、隐藏、设置、退出，共用 show_main_window。</td><td>未运行集成验证。局部 _tray 不是已证实生命周期缺陷，Tauri 会注册保留资源。</td></tr>
+<tr><td>自启动、主题、不透明度</td><td>Run 项、系统主题监听、CSS token 与背景 alpha 有相应路径。</td><td>自启动生效状态分裂 F06。不透明度前端实现仍有效。缺少注册表真实状态校准和交付验收。</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="ui-motion">
+<h2><span class="section-no">05</span>界面设计与动画效果专项</h2>
+<p>本节按“常驻桌面待办应便于阅读、录入、完成和快速找回”的用途检查。毛玻璃、蓝色边框和倾斜是 README 明确的产品方向，不能仅凭这些视觉手法就判设计失当；评价重点是事项是否清晰、控件是否可达、反馈是否准确，以及持续驻留时是否打扰。</p>
+<div class="callout"><p><strong>检查依据：界面源码、颜色计算与动效时序，不是运行截图。</strong>本次新增 F13–F16 四项发现；已有 F08（无效模糊模式）、F09（循环焦点）、F11（减少动画）交叉引用，未重复计数。审查使用 antislop 的界面、可访问性和布局规则，但以 Windows 桌面工具的实际约束为准，不套用移动网站模板。</p></div>
+<h3>设计层级、布局与视觉可读性</h3>
+<div class="table-wrap"><table><caption>设计检查结果；“建议”与“待验”不等于确认缺陷</caption><thead><tr><th scope="col">检查项</th><th scope="col">源码观察与判断</th><th scope="col">建议及验证</th></tr></thead><tbody>
+<tr><td>信息层级与字体</td><td><a href="../src/styles/tokens.css"><code>src/styles/tokens.css:160–200</code></a> 中标题、正文多为 14px，辅助说明 12px；<a href="../src/components/TodoItemRow.tsx"><code>src/components/TodoItemRow.tsx:139–148</code></a> 的显示正文却固定 SimHei/15px/700，编辑切为 body-5 的 14px/500。显示与编辑的字体指标不同，但没有截图证据证明实际严重跳动。</td><td>保留事项优先的层级，统一显示/编辑的字族与基础尺寸，再以字重、间距区分标题和辅助信息。用中文、英文、长 URL、多行事项验证换行和光标稳定。字体栈未见自带字体文件，需检查 Windows 实际回退字形。</td></tr>
+<tr><td>透明层与颜色</td><td>整窗背景不透明度默认 15%，可调 5%–100%；前景卡片、输入、浮层有各自 alpha。半透明文本背景取决于壁纸、内部色块、blur 和叠层，不能只拿单个 token 断言整窗对比度通过。</td><td>主按钮的实色问题已确认，见 <a href="#F13">F13</a>。正文、辅助文字、输入边界与焦点环应在浅/深主题、黑/白/高频壁纸以及不透明度极值中测最终像素；为内容层设可读性的最低保障，不只追求透明。</td></tr>
+<tr><td>固定窗口与受限高度</td><td>400×450 逻辑尺寸不可拖动调整；原生定位把物理高度钳制为工作区的 72%。外层 20px 留白后，实际内容高度还要扣除标题。设置区已有滚动，锁屏/设置密码区是垂直居中且无自身滚动。</td><td>这是高价值待验风险，不能直接称已观察到裁切。重点测高 DPI、确认密码、错误提示和长文本。受限时允许必要内容滚动或自适应；不要为维持玻璃外框而隐藏关键输入和提交按钮。</td></tr>
+<tr><td>目标尺寸与误操作</td><td>按默认根字号换算：完成按钮 16×16、编辑/删除 20×20、标题栏按钮 28×28；编辑/删除间隙约 2px。小目标和相邻破坏性操作需要评估。源码有 focus-within 显示操作，不能说编辑/删除完全鼠标专属。</td><td>可先评估 24–28px 的透明命中区和合理间距，保留小图标。触屏再选择更大目标。<a href="https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html" rel="noreferrer">WCAG 2.2 AA 目标尺寸基准为 24×24 CSS px 并有间距等例外</a>；44px 不应被误写成这里统一强制门槛，最终按实际盒子核验。</td></tr>
+<tr><td>焦点与操作发现</td><td>通用按钮有 focus-visible；新增输入框有容器焦点色；显示器 select 则有 outline-none，未使用已有 focus-ring。密码/编辑框也去掉 outline，但插入光标可能提供焦点指示，不能只凭没有外框就判所有文本框违反标准。</td><td>为 select 补统一且持续可见的焦点样式；逐项检查表单的 Tab 路径、可见焦点、返回焦点和高对比模式。<a href="https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html" rel="noreferrer">W3C 焦点可见说明</a>将文本插入光标列为一种可接受提示；真实 WebView2 表现仍待验。</td></tr>
+<tr><td>控件语义与消息</td><td>设置控件存在名称/选中状态缺口，收起条无直接键盘入口，状态提示没有可靠自动播报。分别见 <a href="#F14">F14</a>、<a href="#F15">F15</a>、<a href="#F16">F16</a>；循环克隆问题见 <a href="#F09">F09</a>。</td><td>让可见标签、程序化名称和状态一致；保留原生控件的键盘模型。对保存失败与撤销结果提供适度播报；内联设置区不必改成模态框。</td></tr>
+<tr><td>拖动、反馈与发现性</td><td><a href="../src/components/TitleBar.tsx"><code>src/components/TitleBar.tsx:23–29</code></a> 已排除按钮并仅左键拖动；空列表有说明；保存错误有文本；行内编辑支持 Escape、Enter 和 IME。完全隐藏滚动条、操作默认隐藏并在 hover 或键盘焦点进入后显露，以及没有保存确认，可能降低初次发现性。</td><td>保留现有有效反馈。通过真实键盘、触摸、初次使用和长列表任务验证发现性；可提供不打断的保存状态和滚动线索。不要无证据声称点击设置会拖走窗口或用户无法滚动。</td></tr>
+</tbody></table></div>
+<p class="small">视觉取舍建议：让常驻状态保持稳定，主要注意力落在事项和下一次输入；蓝色重点用于当前操作、选中或完成反馈。全行永久流光、整窗倾斜、浮动阴影叠加后的注意力成本需实机观察。缺少独立设计规范时，不对“好看/难看”作定论，也不把某个颜色或玻璃风格本身当缺陷。</p>
+<h3>对比度与高度的可复核算例</h3>
+<div class="table-wrap"><table><caption>实色对比度计算；普通文字以 4.5:1 为参考，不是整机合规认证</caption><thead><tr><th scope="col">对象</th><th scope="col">前景 / 背景</th><th scope="col">计算值</th><th scope="col">解释</th></tr></thead><tbody>
+<tr><td>当前主按钮文字</td><td><code>#ffffff / #3b82f6</code></td><td>3.6779:1</td><td>12px 正文不足 4.5:1；两个主题共用此组合，见 F13。</td></tr>
+<tr><td>可评估的更深主色</td><td><code>#ffffff / #2563eb</code></td><td>5.1686:1</td><td>单一实色组合达到参考值；仍需逐状态验证，不代表已修改或整套主题通过。</td></tr>
+</tbody></table></div>
+<p class="small">计算使用 WCAG 相对亮度公式，先线性化 sRGB，再取 <code>(较亮 L + 0.05) / (较暗 L + 0.05)</code>。大字的较低阈值只适用于约 24 CSS px 常规文字或约 18.67 CSS px 粗体，不能把 12px/600 当作大字。<a href="https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html" rel="noreferrer">W3C 原始说明</a>。</p>
+<div class="table-wrap"><table><caption>工作区高 1032 物理像素时的几何算例，来自定位公式，非当前设备测量</caption><thead><tr><th scope="col">缩放</th><th scope="col">窗口逻辑高度</th><th scope="col">减去四周 20px 留白后的高度</th></tr></thead><tbody>
+<tr><td>100% / 150%</td><td>450.0 CSS px</td><td>410.0 CSS px</td></tr>
+<tr><td>175%</td><td>424.57 CSS px</td><td>384.57 CSS px</td></tr>
+<tr><td>200%</td><td>371.5 CSS px</td><td>331.5 CSS px</td></tr>
+<tr><td>250%</td><td>297.2 CSS px</td><td>257.2 CSS px</td></tr>
+</tbody></table></div>
+<p class="small">依据：<a href="../src-tauri/src/win32_window.rs"><code>src-tauri/src/win32_window.rs:49–88</code></a> 与 <a href="../src/App.tsx"><code>src/App.tsx:560–583</code></a>。例如 250% 时 <code>floor(1032 × 0.72) / 2.5 = 297.2</code>；余量还未扣标题与表单 padding。应在 <a href="../src/components/LockOverlay.tsx"><code>src/components/LockOverlay.tsx:58–61</code></a> 的居中布局上验证可达性，而非把已有滚动的设置面板误报为完全不可滚动。</p>
+<h3>动效与微交互清单</h3>
+<div class="table-wrap"><table><caption>当前实现的触发、时序、降级和成本；数值来自源码</caption><thead><tr><th scope="col">效果 / 证据</th><th scope="col">触发与实际时序</th><th scope="col">降级、清理与判断</th></tr></thead><tbody>
+<tr><td>主卡片 3D 倾斜<br><a href="../src/App.tsx"><code>src/App.tsx:319–350</code></a><br><a href="../src/utils/tilt3d.ts"><code>src/utils/tilt3d.ts:10–29</code></a></td><td>鼠标移动后 rAF 调度，perspective 800px，X/Y 最大 ±12°；跟随 90ms，离开 400ms 回正，均用 <code>cubic-bezier(0.22,1,0.36,1)</code>。标题、表单等也处于倾斜父层。</td><td>先取消待执行帧；离开时取消并回正。reduce 阻止后续移动倾斜，但没有偏好变化监听和即时归零；离开仍有 400ms 回正。未见卸载清理 effect，不据此宣称泄漏。建议可关闭，并在编辑/键盘模式保持稳定。</td></tr>
+<tr><td>逐行边框流光<br><a href="../src/styles/global.css"><code>src/styles/global.css:31–40</code></a><br><a href="../src/styles/global.css"><code>src/styles/global.css:68–90</code></a></td><td>挂载即运行，伪元素渐变角度 0→360°，<code>4.2s linear infinite</code>；无 hover/新状态门控。普通列表 N 个，循环开启为 3N 个行伪元素。</td><td>F11 未覆盖该伪元素；卸载结束，无离屏/失焦暂停策略。渐变、mask 是成本来源，但 3N 个声明不等于浏览器持续绘制所有离屏行。建议常驻时静止，短暂强调有意义的状态。</td></tr>
+<tr><td>行 hover 放大、背景和阴影<br><a href="../src/styles/global.css"><code>src/styles/global.css:58–111</code></a></td><td>进入行时 scale 1.03、阴影及背景改变；180ms 减速，z-index=2。编辑状态取消放大和阴影。</td><td>reduce 取消外层缩放，背景色反馈保留。祖先滚动区/主卡片会约束外扩视觉，但已有留白，不能直接称必然裁切；重点测首尾行、长内容、边缘粒子。与父层倾斜是不同元素，效果叠加，不是同元素 transform 覆盖冲突。</td></tr>
+<tr><td>编辑/删除按钮显露<br><a href="../src/components/TodoItemRow.tsx"><code>src/components/TodoItemRow.tsx:155–178</code></a></td><td>hover 或 focus-within 时 opacity 0→1，150ms；已有键盘焦点显露路径。</td><td>保留短透明度反馈；需解决 F09 的隐藏克隆焦点。触摸没有 hover，应验证首次点击能否发现并安全操作，不凭源码断言已经不能用。</td></tr>
+<tr><td>通用按钮按压<br><a href="../src/styles/global.css"><code>src/styles/global.css:123–147</code></a></td><td>按压 scale 0.98，transform160ms，背景和透明度200ms；非禁用状态才缩放。焦点外框即时出现。</td><td>reduce 去掉 transform，颜色/透明度改150ms线性。适合保留。只有声明对应状态和属性的按钮会发生颜色过渡，不能写成所有控件都有完整补间。</td></tr>
+<tr><td>完成撒花<br><a href="../src/components/ConfettiBurst.tsx"><code>src/components/ConfettiBurst.tsx:7–45</code></a><br><a href="../src/components/TodoItemRow.tsx"><code>src/components/TodoItemRow.tsx:91–102</code></a><br><a href="../src/styles/global.css"><code>src/styles/global.css:43–54</code></a></td><td>未完成→完成时，12 个 6×6px 粒子平移、旋转、缩小至0.45；650ms，70%后淡出；700ms后关闭状态。取消完成不新增撒花。</td><td>有计时器替换和卸载清理；reduce 漏覆盖，见F11。celebrating 是点击行本地状态，不会因三段同步 completed 就自动产生三倍粒子。建议局部、可关闭；快速完成→取消→完成时是否可靠重播另验。</td></tr>
+<tr><td>新增输入与行内编辑<br><a href="../src/components/TodoInput.tsx"><code>src/components/TodoInput.tsx:14–29</code></a><br><a href="../src/components/TodoInput.tsx"><code>src/components/TodoInput.tsx:48–90</code></a><br><a href="../src/components/TodoItemRow.tsx"><code>src/components/TodoItemRow.tsx:41–60</code></a></td><td>输入容器焦点色220ms；输入高度直接随 scrollHeight 改变，上限96px。编辑下一帧聚焦并将光标置末尾，直接更新高度，无高度补间。</td><td>ResizeObserver 有断开；编辑 rAF 检查 ref。输入时稳定光标和内容优先，不应为“动效齐全”强行增加高度动画。</td></tr>
+<tr><td>撤销、错误、设置与密码遮罩<br><a href="../src/components/UndoToast.tsx"><code>src/components/UndoToast.tsx:10–25</code></a><br><a href="../src/App.tsx"><code>src/App.tsx:624–708</code></a></td><td>按条件直接挂载/卸载；撤销5秒后消失。没有 toast 出入动画、倒计时或统一布局过渡。主题/透明度也无统一整窗淡变。</td><td>立即切换本身不是缺陷。若实测内容跳动妨碍追踪，可评估短淡入；优先解决 F04/F05/F16 的保存、草稿和消息语义。不要用动效掩盖尚未完成的状态转换。</td></tr>
+<tr><td>贴边收起与展开<br><a href="../src-tauri/src/lib.rs"><code>src-tauri/src/lib.rs:225–260</code></a><br><a href="../src-tauri/src/win32_window.rs"><code>src-tauri/src/win32_window.rs:305–338</code></a></td><td>2秒启动保护，约400ms在外条件，由300ms轮询/420ms延时探测；原生单次 SetWindowPos 调整尺寸，React 切换互斥分支。</td><td><strong>当前没有滑入滑出几何动画。</strong>DWM transition 被禁用；<code>--duration-layout:320ms</code> 仅定义未使用。原生 resize 与 React 提交不是同一绘制事务，是否闪现/挤压待逐帧验证，不能静态判必然闪烁。</td></tr>
+</tbody></table></div>
+<h3>动效目的、性能与验收优先级</h3>
+<p>优先保留输入焦点、按钮反馈、完成勾选这些能解释操作结果的反馈；把整窗倾斜和逐行永久流光作为可选装饰。F11 修复应同时覆盖“启动已请求减少动作”和“运行中切换偏好”：停止伪元素与粒子动画、让旧倾斜立即归零，并保留清楚的静态勾选。</p>
+<p>性能检查应把长期动画、blur、渐变 mask、box-shadow、合成层与每帧读写分开记录。在常用与压力条目规模中测主线程、paint、输入响应、GPU/内存；目前没有 FPS、卡顿、功耗或内存泄漏数据。也不建议为所有属性添加 transition，或在原生窗口几何与内容状态尚不一致时先加长动画。</p>
+<ol>
+<li>先处理 F13–F16、F09/F11，让文字、键盘、消息与静态反馈可靠；无效模糊模式按 F08 收敛。</li>
+<li>再获得运行授权，核验高 DPI 密码表单、hover 边缘、三段循环焦点、壁纸与主题极值；记录实际 viewport 和渲染证据。</li>
+<li>最后决定倾斜、流光与撒花的默认强度/开关，并用性能测量决定暂停和合成策略。当前只给检查与方案，未修改界面或动画。</li>
+</ol>
+</section>
+
+<section id="findings">
+<h2><span class="section-no">06</span>发现与处理建议</h2>
+<p class="small muted">每项给出触发条件、因果、影响、修改位置和验收方式。P1/P2/P3 为本次项目审查优先级，不等同 CVSS 或正式安全扫描评级。若后续代码变化，应重新核对行号及结论。</p>
+<article class="finding" id="F01">
+<div class="finding-top"><span class="priority p1">P1</span><span class="mono">F01</span><span class="muted">密码锁</span></div>
+<h3>保存并锁定后残留有效密码，可直接再次解锁</h3>
+<p class="evidence-line">证据：<a href="../src/App.tsx"><code>src/App.tsx:303–308</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:624–637</code></a> · <a href="../src/components/LockOverlay.tsx"><code>src/components/LockOverlay.tsx:17–18</code></a> · <a href="../src/components/LockOverlay.tsx"><code>src/components/LockOverlay.tsx:34–51</code></a> · <a href="../src/components/LockOverlay.tsx"><code>src/components/LockOverlay.tsx:88–91</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>首次设置或修改密码，输入并确认新密码，点击“保存并锁定”；随后不重新输入，直接点击“解锁”或按 Enter。</dd><dt>因果链</dt><dd>setup 与 unlock 分支在同一个 React 树位置渲染同类型、没有不同 key 的 LockOverlay。mode 变化会保留组件的 password 状态，设置成功的分支没有清空该状态。切换为解锁表单后，受控 input 继续持有刚设置的正确密码，下一次提交可直接验证成功。</dd><dt>实际影响</dt><dd>刚执行的界面锁定可以由下一位操作者直接点击解除。这一结论限于“设置/修改密码后立即锁定”的路径，不代表所有锁定状态都能绕过。</dd><dt>建议修改</dt><dd>在 App.tsx 为 setup/unlock 设置明确不同的组件 key，或在模式切换及提交成功后清空 password、confirm、error。确保 submitting 也随新的表单生命周期复位；不要只把密码框视觉隐藏。</dd><dt>验证方式</dt><dd>分别验证首次设置和修改密码：锁定后密码字段为空，空提交被拒绝，错误密码被拒绝，重新输入正确密码才解锁。检查 DOM 中没有残留可直接提交的密码。</dd></dl>
+<p class="confidence">证据强度：高，源码与 React 状态规则可确定。均未运行复现。 <a href="https://react.dev/learn/preserving-and-resetting-state" rel="noreferrer">React 明确将状态与渲染树位置关联。</a></p>
+</article>
+<article class="finding" id="F02">
+<div class="finding-top"><span class="priority p1">P1</span><span class="mono">F02</span><span class="muted">数据可靠性</span></div>
+<h3>加载未完成或加载失败后仍可保存默认快照，存在覆盖原数据的路径</h3>
+<p class="evidence-line">证据：<a href="../src/App.tsx"><code>src/App.tsx:59–85</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:144–158</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:240–257</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:638–668</code></a> · <a href="../src-tauri/src/lib.rs"><code>src-tauri/src/lib.rs:62–78</code></a> · <a href="../src-tauri/src/lib.rs"><code>src-tauri/src/lib.rs:81–105</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>场景一：旧 todos.json 正常、settings.json 解析失败，启动后添加一条待办。场景二：加载被延迟时，在窗口中先提交待办或修改设置。均需隔离副本验证，不能用真实用户数据试验。</dd><dt>因果链</dt><dd>前端初始 todos=[]、settings=默认值。聚合 load_app_state 的任一读取失败都会让整体返回错误；catch 只显示消息并设置 loaded=true，输入、设置和保存函数没有 ready 门控。加载中的交互也未被禁止。后端 save_todos/save_settings 接收完整快照并替换对应文件。</dd><dt>实际影响</dt><dd>故障后添加新待办可能用“仅含新条目”的快照覆盖仍正常的旧待办文件；修改普通设置可能覆盖旧密码配置。启动期间已输入的内容还可能被迟到的加载结果覆盖。失败页面本身为空，不能据此称旧待办立即泄露。</dd><dt>建议修改</dt><dd>将 loaded 布尔值改为明确的 loading/ready/error 状态；渲染层与保存入口同时要求 ready。将 todos、settings、显示器枚举的失败分开处理。出错时提供重试和保留损坏副本的恢复入口，恢复确认前禁止覆盖原文件。</dd><dt>验证方式</dt><dd>模拟加载延迟、settings 损坏而 todos 正常、todos 损坏、读取权限失败以及显示器枚举失败。ready 之前和加载错误之后，应没有保存调用，原数据文件字节保持不变；重试成功后再启用编辑。</dd></dl>
+<p class="confidence">证据强度：高，覆盖路径明确；磁盘故障场景未运行。均未运行复现。</p>
+</article>
+<article class="finding" id="F03">
+<div class="finding-top"><span class="priority p2">P2</span><span class="mono">F03</span><span class="muted">密码与持久化</span></div>
+<h3>密码设置没有等待落盘成功，失败后仍进入锁屏并隐藏错误</h3>
+<p class="evidence-line">证据：<a href="../src/App.tsx"><code>src/App.tsx:135–142</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:240–257</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:303–308</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:624–655</code></a> · <a href="../src/components/LockOverlay.tsx"><code>src/components/LockOverlay.tsx:22–55</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>设置或修改密码时，让 save_settings 因临时文件写入或 rename 失败而返回错误。</dd><dt>因果链</dt><dd>handleSavePassword 只等待哈希计算；handleUpdateSettings 返回 void，内部以 void persistSettings 发出保存。LockOverlay 中 await onSavePassword 并没有等待磁盘确认。内存密码先更新、界面立即锁定；持久化错误写入 App.errorMsg，但该消息只在未锁定的普通内容分支显示。</dd><dt>实际影响</dt><dd>用户看到已锁定，实际上新密码只存在本次内存中。退出重启后可能恢复旧密码，首次设置则可能恢复无密码。即使修复 F01，这个失败路径仍然存在。</dd><dt>建议修改</dt><dd>为密码更新提供单独、可 await 且能传播失败的提交函数。先持久化成功，再提交生效密码和锁定状态；失败留在设置表单，显示错误并允许重试。</dd><dt>验证方式</dt><dd>延迟保存时保持提交中状态；保存拒绝时不得宣布成功、不得用新密码替换已生效配置，错误必须可见。成功保存后重新加载，应能使用新密码。</dd></dl>
+<p class="confidence">证据强度：高，异步调用链明确。均未运行复现。</p>
+</article>
+<article class="finding" id="F04">
+<div class="finding-top"><span class="priority p2">P2</span><span class="mono">F04</span><span class="muted">错误恢复</span></div>
+<h3>不相关的保存成功会清除尚未恢复的失败提示</h3>
+<p class="evidence-line">证据：<a href="../src/App.tsx"><code>src/App.tsx:126–142</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:154–158</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:642–655</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>待办保存失败后，修改主题并让设置保存成功；反过来，设置失败后成功保存一条待办也有同类问题。</dd><dt>因果链</dt><dd>todos 与 settings 共用一个 errorMsg，任一路径成功都无条件 setErrorMsg(null)。前端已经乐观更新内存，没有分别记录未保存版本、dirty 状态、重试或已恢复确认。</dd><dt>实际影响</dt><dd>失败数据仍未落盘，但警告消失。用户继续使用或退出时，可能误以为数据已保存。一次无关成功不能证明此前失败已恢复。</dd><dt>建议修改</dt><dd>分别追踪 todos/settings 的保存中、已保存、失败状态，并关联数据版本。只有相同对象的目标版本确实保存成功才清除其错误；提供明确重试入口。</dd><dt>验证方式</dt><dd>覆盖两类数据交叉成功/失败的组合：无关成功不清除失败；对应版本重试成功才清除。重启读取内容应与界面最终确认状态一致。</dd></dl>
+<p class="confidence">证据强度：高，条件路径明确。均未运行复现。</p>
+</article>
+<article class="finding" id="F05">
+<div class="finding-top"><span class="priority p2">P2</span><span class="mono">F05</span><span class="muted">交互与草稿</span></div>
+<h3>贴边收起会卸载输入组件，丢失未提交草稿</h3>
+<p class="evidence-line">证据：<a href="../src/App.tsx"><code>src/App.tsx:359–365</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:400–406</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:523–557</code></a> · <a href="../src/components/TodoInput.tsx"><code>src/components/TodoInput.tsx:8–12</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>启用自动贴边隐藏，输入多行新待办但不按 Enter；把焦点切到其他应用并让鼠标离开窗口，等待收起后再展开。</dd><dt>因果链</dt><dd>isActivelyTyping 在 document.hasFocus() 为 false 时立即返回 false，即使输入框有内容。收起时 App 提前 return 小竖条，卸载普通主树；新增草稿仅由 TodoInput 本地 useState 保存，再挂载时恢复空串。</dd><dt>实际影响</dt><dd>未提交的多行输入丢失。锁定/解锁同样切换主树，草稿保留策略也应明确。</dd><dt>建议修改</dt><dd>把新增草稿提升至不会因收起而卸载的状态层，或保持主树挂载并控制可见性。同步确定锁定、切换设置和退出时的草稿策略。</dd><dt>验证方式</dt><dd>输入多行文本 → 失焦 → 自动收起 → 展开，文本逐字保留；补测锁定/解锁及打开/关闭设置。提交成功后才按策略清空。</dd></dl>
+<p class="confidence">证据强度：高，组件生命周期可确定。均未运行复现。</p>
+</article>
+<article class="finding" id="F06">
+<div class="finding-top"><span class="priority p2">P2</span><span class="mono">F06</span><span class="muted">系统设置一致性</span></div>
+<h3>自启动设置与注册表更新分裂，界面状态可能与系统相反</h3>
+<p class="evidence-line">证据：<a href="../src/App.tsx"><code>src/App.tsx:240–257</code></a> · <a href="../src/components/SettingsPanel.tsx"><code>src/components/SettingsPanel.tsx:199–208</code></a> · <a href="../src-tauri/src/lib.rs"><code>src-tauri/src/lib.rs:91–105</code></a> · <a href="../src-tauri/src/lib.rs"><code>src-tauri/src/lib.rs:176–199</code></a> · <a href="../src-tauri/src/lib.rs"><code>src-tauri/src/lib.rs:340–349</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>切换自启动时，settings.json 保存成功但 Run 项写入被拒绝；或文件保存失败而注册表更新成功。外部程序修改 Run 项也会造成漂移。</dd><dt>因果链</dt><dd>前端分别发起 save_settings 与 set_launch_at_startup，并立即更新本地状态；两个操作之间没有成功协调或补偿。启动和打开设置时都不查询注册表真实状态，复选框仅显示 JSON 中的布尔值。</dd><dt>实际影响</dt><dd>可能显示已启用但实际上不启动，也可能显示已禁用而系统仍会启动。错误还能受到 F04 的覆盖影响。</dd><dt>建议修改</dt><dd>由一个后端入口协调系统操作、配置保存及失败补偿，返回实际生效状态。启动或打开设置时校准 Run 项；将注册表访问封装为可替换适配层。</dd><dt>验证方式</dt><dd>在替身注册表层模拟两个方向的部分失败与外部改动，检查 UI、JSON 和系统状态的一致性以及明确错误。真正修改 Run 项的实机验证须另获授权。</dd></dl>
+<p class="confidence">证据强度：高，部分失败路径明确。均未运行复现。</p>
+</article>
+<article class="finding" id="F07">
+<div class="finding-top"><span class="priority p2">P2</span><span class="mono">F07</span><span class="muted">原生窗口状态</span></div>
+<h3>显示器移除后的恢复仅改窗口几何，没有同步收起状态</h3>
+<p class="evidence-line">证据：<a href="../src-tauri/src/lib.rs"><code>src-tauri/src/lib.rs:38–58</code></a> · <a href="../src-tauri/src/lib.rs"><code>src-tauri/src/lib.rs:225–260</code></a> · <a href="../src-tauri/src/lib.rs"><code>src-tauri/src/lib.rs:299–321</code></a> · <a href="../src-tauri/src/lib.rs"><code>src-tauri/src/lib.rs:351–375</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:523–557</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>便利贴已在副屏收起；移除原显示器或改变屏幕拓扑，且处理事件时窗口中心未被 Windows 自动迁移到任何剩余工作区，使 !is_window_on_any_monitor 成立。</dd><dt>因果链</dt><dd>显示变化回调调用完整 reposition_window，恢复到 400 × logical_height 的窗口矩形；却不清除 RuntimeState.is_edge_hidden、不更新恢复坐标，也不发送 edge-unhide。React 仍渲染小竖条。托盘 show_main_window 已有另一套包含状态同步的恢复逻辑。</dd><dt>实际影响</dt><dd>原生矩形已展开，内容仍是收起条，形成较大的透明窗口与状态不一致。该分支若未被操作系统事件顺序触发，则不会出现本项现象。</dd><dt>建议修改</dt><dd>建立统一拓扑恢复入口：根据当前状态重算 peek 几何，或显式转为展开并同步 Rust、React 与原生矩形。复用托盘恢复的状态协调，避免只改 HWND。</dd><dt>验证方式</dt><dd>在双屏上收起后断开副屏、切换拓扑，同时记录原生矩形、Rust hidden 与 React hidden，要求三者一致；随后验证悬停展开和托盘显示。</dd></dl>
+<p class="confidence">证据强度：高，具有明确前置条件的源码缺陷。均未运行复现。</p>
+</article>
+<article class="finding" id="F08">
+<div class="finding-top"><span class="priority p2">P2</span><span class="mono">F08</span><span class="muted">功能真实性</span></div>
+<h3>两种背景模糊模式只有选中状态变化，没有实际模式差异</h3>
+<p class="evidence-line">证据：<a href="../src/components/SettingsPanel.tsx"><code>src/components/SettingsPanel.tsx:66–106</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:103–113</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:605–612</code></a> · <a href="../src-tauri/src/lib.rs"><code>src-tauri/src/lib.rs:140–152</code></a> · <a href="../src-tauri/src/win32_window.rs"><code>src-tauri/src/win32_window.rs:510–535</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>在相同背景、主题和不透明度下，切换“柔和亚克力”与“标准模糊”。</dd><dt>因果链</dt><dd>设置进入 set_backdrop，但 apply_backdrop 忽略 _blur_mode、_opacity_percent 和 _is_dark，原生策略恒为 ACCENT_DISABLED。CSS backdropFilter 始终是 blur(16px)，也不根据 blurMode 改变。</dd><dt>实际影响</dt><dd>模式值会保存，按钮选中会改变，但没有对应模式实现；设置说明关于可切换模糊模式的表述不准确。不透明度仍通过 glassBackground 生效，不能把它一并判为失效。</dd><dt>建议修改</dt><dd>在符合透明圆角和倾斜要求的前提下实现可验证的模式差异；若当前设计只支持一种 CSS 玻璃效果，则移除无效选项并统一说明。</dd><dt>验证方式</dt><dd>在 Windows 10/11、相同背景及参数下核对模式切换的原生属性和显示结果；不能只验证按钮选中和 JSON 值改变。</dd></dl>
+<p class="confidence">证据强度：高，前后端数据流完整。均未运行复现。</p>
+</article>
+<article class="finding" id="F09">
+<div class="finding-top"><span class="priority p2">P2</span><span class="mono">F09</span><span class="muted">键盘与辅助技术</span></div>
+<h3>无限列表的隐藏克隆仍可聚焦，编辑输入脱离可访问树</h3>
+<p class="evidence-line">证据：<a href="../src/components/InfiniteTodoList.tsx"><code>src/components/InfiniteTodoList.tsx:71–79</code></a> · <a href="../src/components/InfiniteTodoList.tsx"><code>src/components/InfiniteTodoList.tsx:124–145</code></a> · <a href="../src/components/InfiniteTodoList.tsx"><code>src/components/InfiniteTodoList.tsx:155–164</code></a> · <a href="../src/components/TodoItemRow.tsx"><code>src/components/TodoItemRow.tsx:122–137</code></a> · <a href="../src/components/TodoItemRow.tsx"><code>src/components/TodoItemRow.tsx:158–197</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>条目高度超过视口、开启 A/B/C 三段循环后，用 Tab 遍历操作按钮；或滚动到 A/C 段，双击某条进行编辑。</dd><dt>因果链</dt><dd>A/C 只设置 aria-hidden=true，内部仍渲染普通 button 和可编辑 textarea，没有排除顺序聚焦，也没有把活跃交互转交主副本。aria-hidden 不能取消原生控件的 Tab 行为，祖先隐藏还会让活跃编辑框被辅助技术忽略。</dd><dt>实际影响</dt><dd>每条待办有三份可聚焦操作；克隆内焦点缺少对应可访问信息。浏览器为聚焦自动滚动时，列表包装滚动还可能把可见位置移走，这一视觉后果需运行确认。</dd><dt>建议修改</dt><dd>为克隆建立明确的交互与焦点模型，常规 Tab 顺序只暴露一套条目操作；把克隆上的编辑映射到主副本，或在活跃时同步可访问树。避免简单给交互区域加 aria-hidden。</dd><dt>验证方式</dt><dd>循环启用后逐项 Tab，每条只经过一套操作；聚焦控件可见且没有 aria-hidden 祖先；从每个段进入编辑，读屏均能识别输入与内容。</dd></dl>
+<p class="confidence">证据强度：高；焦点引起的视觉跳动仍待实测。均未运行复现。 <a href="https://www.w3.org/WAI/standards-guidelines/act/rules/6cfa84/" rel="noreferrer">W3C ACT 规则要求 aria-hidden 区域不能包含可顺序聚焦的后代。</a></p>
+</article>
+<article class="finding" id="F10">
+<div class="finding-top"><span class="priority p3">P3</span><span class="mono">F10</span><span class="muted">状态管理</span></div>
+<h3>把保存和系统操作放在 React updater 内，开发时会重复副作用</h3>
+<p class="evidence-line">证据：<a href="../src/main.tsx"><code>src/main.tsx:6–9</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:154–158</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:193–208</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:242–257</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>在已启用 StrictMode 的开发构建中添加、编辑、删除待办或切换系统设置。</dd><dt>因果链</dt><dd>setTodos/setSettings 的 updater 内直接发起持久化、注册表或置顶 IPC；删除 updater 还更新另一状态并创建计时器。React 开发检查会重复调用本应保持纯函数的 updater。</dd><dt>实际影响</dt><dd>同一次用户操作可能发出重复磁盘写入和系统调用，增加调试噪声并让提交逻辑难以推理。本次不据此断言生产版本一定乱序或文件损坏。</dd><dt>建议修改</dt><dd>保持 updater 只计算新状态，把副作用移到显式提交层或有版本去重的保存协调器。不要通过关闭 StrictMode 掩盖问题。</dd><dt>验证方式</dt><dd>在 StrictMode 中监控一次用户动作对应的提交次数；领域状态更新和系统操作应有明确的一次提交语义，同时测试失败与重试。</dd></dl>
+<p class="confidence">证据强度：高；实际重复次数未运行采样。均未运行复现。 <a href="https://react.dev/reference/react/StrictMode" rel="noreferrer">React 官方列明，开发 StrictMode 会重复调用传给状态 setter 的纯计算函数。</a></p>
+</article>
+<article class="finding" id="F11">
+<div class="finding-top"><span class="priority p3">P3</span><span class="mono">F11</span><span class="muted">可访问性</span></div>
+<h3>减少动态效果规则没有覆盖流光伪元素和撒花粒子</h3>
+<p class="evidence-line">证据：<a href="../src/styles/global.css"><code>src/styles/global.css:68–90</code></a> · <a href="../src/styles/global.css"><code>src/styles/global.css:114–120</code></a> · <a href="../src/styles/global.css"><code>src/styles/global.css:140–148</code></a> · <a href="../src/components/ConfettiBurst.tsx"><code>src/components/ConfettiBurst.tsx:1–46</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>系统请求 prefers-reduced-motion: reduce，查看流光边框或点击完成待办。</dd><dt>因果链</dt><dd>媒体查询停用的是 .todo-card-border-wrap 本体动画，而旋转 animation 定义在 ::before；撒花 .confetti-piece 也没有被覆盖。animation 不通过父元素继承为 none。</dd><dt>实际影响</dt><dd>请求减少动作的用户仍会看到持续流光和粒子飞行动画。3D 倾斜本身已有 reduced-motion 判断，不能称整个项目完全未处理该偏好。</dd><dt>建议修改</dt><dd>在对应媒体查询显式停用 ::before 与 .confetti-piece 的动画，或在 reduce 状态不挂载粒子。保留完成状态的静态反馈。</dd><dt>验证方式</dt><dd>模拟 reduce 后，两类元素的计算 animation 均为 none；完成切换仍有清晰的静态勾选反馈。</dd></dl>
+<p class="confidence">证据强度：高，CSS 选择器可确定。均未运行复现。</p>
+</article>
+<article class="finding" id="F12">
+<div class="finding-top"><span class="priority p3">P3</span><span class="mono">F12</span><span class="muted">开发与交付</span></div>
+<h3>README 声明 Node.js 18+，锁定的构建依赖要求 Node.js 20+</h3>
+<p class="evidence-line">证据：<a href="../README.md"><code>README.md:18–21</code></a> · <a href="../package-lock.json"><code>package-lock.json:1241–1267</code></a> · <a href="../package.json"><code>package.json:5–11</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>开发者按 README 使用 Node.js 18，并安装锁文件中的依赖。</dd><dt>因果链</dt><dd>package-lock.json 锁定 @tailwindcss/oxide 4.3.5，其 engines.node 为 &gt;= 20；README 仍写 Node.js 18+，package.json 没有声明统一 engines。</dd><dt>实际影响</dt><dd>文档给出的最低版本不满足实际依赖约束，可能出现 engine 警告、严格引擎检查拒绝或后续原生依赖兼容问题。本次未在 Node.js 18 上执行安装，不能宣称一定在哪一步失败。</dd><dt>建议修改</dt><dd>统一 README、package.json engines 与 CI 中的 Node 版本，选择实际维护和验证的版本。日常与 CI 使用锁文件安装；同时记录 Rust/MSVC 的构建前置条件。</dd><dt>验证方式</dt><dd>获授权后在声明的最低版本和主要开发版本上执行锁文件安装、测试及构建；依赖引擎不应冲突。</dd></dl>
+<p class="confidence">证据强度：高，锁文件引擎约束明确。均未运行复现。</p>
+</article>
+
+<article class="finding" id="F13">
+<div class="finding-top"><span class="priority p2">P2</span><span class="mono">F13</span><span class="muted">文字与色彩</span></div>
+<h3>默认主色按钮的小号白字对比度不足</h3>
+<p class="evidence-line">证据：<a href="../src/styles/tokens.css"><code>src/styles/tokens.css:55</code></a> · <a href="../src/styles/tokens.css"><code>src/styles/tokens.css:96–105</code></a> · <a href="../src/styles/tokens.css"><code>src/styles/tokens.css:136–145</code></a> · <a href="../src/styles/tokens.css"><code>src/styles/tokens.css:184–187</code></a> · <a href="../src/components/UndoToast.tsx"><code>src/components/UndoToast.tsx:30–34</code></a> · <a href="../src/components/LockOverlay.tsx"><code>src/components/LockOverlay.tsx:137–147</code></a> · <a href="../src/components/SettingsPanel.tsx"><code>src/components/SettingsPanel.tsx:79–100</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>使用带文字的主色按钮，例如“撤销”“保存并锁定”或选中的主题选项。该组合同时用于浅色和深色主题。</dd><dt>因果链</dt><dd>--action-primary 指向不透明 #3b82f6，--text-inverted 为 #ffffff；button-xsm 为 12px/600。按 WCAG 相对亮度公式计算，配色对比度为 3.6779:1，低于普通文字 4.5:1。这里不涉及桌面壁纸或透明背景的猜测。</dd><dt>实际影响</dt><dd>小号按钮文字对低视力用户和较差观看条件不够清晰。12px 粗体不属于可按 3:1 衡量的大字；图标的非文字阈值也不能代替文字阈值。</dd><dt>建议修改</dt><dd>在 tokens.css 为带白字的主按钮选择更深的实色背景或合适前景色，再检查默认、选中、hover、focus 各状态。已有 #2563eb 可作为候选，其对白色为 5.1686:1；这只是计算候选，不表示所有按钮当前 hover 已采用它。</dd><dt>验证方式</dt><dd>逐项计算实际文字与背景组合；普通文字至少 4.5:1，并在两个主题检查。半透明正文应另按实际合成背景评估，不能用这一组实色结果代替。</dd></dl>
+<p class="confidence">证据强度：高，实色 token 与算术可确定；未实机观察。均未运行复现。 <a href="https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html" rel="noreferrer">W3C：文字对比度</a>。</p>
+</article>
+<article class="finding" id="F14">
+<div class="finding-top"><span class="priority p2">P2</span><span class="mono">F14</span><span class="muted">表单语义</span></div>
+<h3>设置控件的名称和选中状态没有完整暴露给辅助技术</h3>
+<p class="evidence-line">证据：<a href="../src/components/SettingsPanel.tsx"><code>src/components/SettingsPanel.tsx:46–63</code></a> · <a href="../src/components/SettingsPanel.tsx"><code>src/components/SettingsPanel.tsx:79–100</code></a> · <a href="../src/components/SettingsPanel.tsx"><code>src/components/SettingsPanel.tsx:122–171</code></a> · <a href="../src/components/SettingsPanel.tsx"><code>src/components/SettingsPanel.tsx:175–208</code></a> · <a href="../src/components/TitleBar.tsx"><code>src/components/TitleBar.tsx:75–88</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>使用读屏的表单导航访问不透明度滑块、显示器选择和三个开关，或在主题/模糊模式选项之间切换。</dd><dt>因果链</dt><dd>五个原生控件的业务说明只是相邻 span，没有 label/htmlFor、aria-label 或 aria-labelledby。主题/模糊选项通过颜色改变选中外观，但普通 button 没有 aria-pressed 或单选状态；设置入口也没有展开状态。原生 checkbox 的勾选值存在，缺失的是业务名称。</dd><dt>实际影响</dt><dd>用户无法可靠判断某个滑块/开关控制什么，或哪一个主题已选中。仅有可见文字和颜色不能替代控件名称与程序化状态。</dd><dt>建议修改</dt><dd>在 SettingsPanel 将说明与原生控件用 label 关联；滑块可提供百分比值文字。单选项采用原生 radio 分组或语义完整的按钮状态；设置入口补 aria-expanded 与面板关联。内联面板无需强行改成模态框。</dd><dt>验证方式</dt><dd>检查 WebView2 可访问树中的名称、角色、值/勾选状态；Narrator 或 NVDA 逐项导航时读出业务名称。每组选择只有一个有效选中值，键盘操作符合所用语义。</dd></dl>
+<p class="confidence">证据强度：高，名称与状态标记缺失可确定；未读屏验收。均未运行复现。 <a href="https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html" rel="noreferrer">W3C：名称、角色、值</a>。</p>
+</article>
+<article class="finding" id="F15">
+<div class="finding-top"><span class="priority p2">P2</span><span class="mono">F15</span><span class="muted">键盘入口</span></div>
+<h3>贴边收起条没有直接的键盘展开操作</h3>
+<p class="evidence-line">证据：<a href="../src/App.tsx"><code>src/App.tsx:523–557</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:444–457</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>便利贴已收起，仅通过键盘或辅助技术操作可见的侧边展开入口。</dd><dt>因果链</dt><dd>收起分支只渲染 div 和 span，展开依赖 onMouseEnter/onClick；没有原生 button、顺序焦点、Enter/Space 处理或可聚焦的操作名称。</dd><dt>实际影响</dt><dd>用户不能直接用 Tab/Enter/Space 操作这个展开入口。系统托盘“显示”仍可能作为回退，不能扩大为整个应用无法通过键盘恢复。</dd><dt>建议修改</dt><dd>将实际收起条改为有明确名称的原生 button，保留鼠标移入展开，提供焦点样式；同时核验原生小窗口的激活和焦点策略，避免按钮虽有语义却无法取得窗口焦点。</dd><dt>验证方式</dt><dd>窗口收起后，通过键盘或辅助技术识别“展开便利贴”并恢复；焦点位置清晰，恢复后不丢草稿。独立验证托盘回退，覆盖浅色/深色与不同 DPI。</dd></dl>
+<p class="confidence">证据强度：高，入口缺少键盘行为可确定；原生焦点行为待实机。均未运行复现。 <a href="https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html" rel="noreferrer">W3C：键盘操作</a>。</p>
+</article>
+<article class="finding" id="F16">
+<div class="finding-top"><span class="priority p3">P3</span><span class="mono">F16</span><span class="muted">状态反馈</span></div>
+<h3>保存错误、密码错误和删除提示缺少可靠的自动播报</h3>
+<p class="evidence-line">证据：<a href="../src/App.tsx"><code>src/App.tsx:200–206</code></a> · <a href="../src/App.tsx"><code>src/App.tsx:642–655</code></a> · <a href="../src/components/LockOverlay.tsx"><code>src/components/LockOverlay.tsx:116–119</code></a> · <a href="../src/components/UndoToast.tsx"><code>src/components/UndoToast.tsx:14–25</code></a></p>
+<dl class="finding-body"><dt>触发条件</dt><dd>焦点留在输入或操作控件时，后台保存失败、密码验证失败，或删除后出现短暂撤销提示。</dd><dt>因果链</dt><dd>消息只是普通 div/p/span，没有 live region、alert/status 或相应焦点通知；密码错误也没有与输入通过 aria-describedby/aria-invalid 关联。删除提示在五秒后消失。</dd><dt>实际影响</dt><dd>读屏用户可能错过失败原因和限时撤销机会。文字仍能通过其他浏览导航找到，不能说所有读屏在所有情况下都完全无法访问它。</dd><dt>建议修改</dt><dd>用稳定挂载的 polite 状态区域播报操作结果；对保存/验证失败选择适当的错误通知，关联错误与输入。避免每次计数变化都打断用户；撤销计时是否在聚焦/悬停时暂停应明确为产品策略。</dd><dt>验证方式</dt><dd>焦点不被强行抢走，读屏能及时获知删除结果与错误，重渲染不重复播报。仅用键盘可到达撤销并执行；输入错误关联可在重新聚焦时读出。</dd></dl>
+<p class="confidence">证据强度：高，消息语义缺失可确定；具体读屏表现待验。均未运行复现。 <a href="https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html" rel="noreferrer">W3C：状态消息</a>。</p>
+</article>
+</section>
+
+<section id="risks">
+<h2><span class="section-no">07</span>架构、可靠性与安全风险</h2>
+<p>以下是需要补设计或验证的边界。它们没有被重复计入确认发现，也不表示已发生故障或已存在完整攻击路径。</p>
+<h3>保存语义与恢复</h3>
+<ul>
+<li><strong>替换写入不等于断电耐久。</strong><a href="../src-tauri/src/storage.rs"><code>src-tauri/src/storage.rs:59–64</code></a> 使用同目录 tmp → rename，没有 <code>File::sync_all</code>、备份和残留临时文件恢复。正常写临时文件或 rename 失败通常仍保留旧正式文件；突然断电后的保证尚未定义。建议根据重要性增加最后一份有效副本、坏文件隔离和恢复策略。</li>
+<li><strong>空文件被当作全新默认状态。</strong><a href="../src-tauri/src/storage.rs"><code>src-tauri/src/storage.rs:69–79</code></a> 没有区分初次运行与意外空文件。建议把“文件不存在”与“存在但内容异常”设为不同结果，配合 F02 阻止静默覆盖。</li>
+<li><strong>修改后台执行模型前先定义写序。</strong>当前同步 command 加单实例，不能仅因固定 <code>.json.tmp</code> 就宣称存在可达的单进程并发写坏文件漏洞。未来若改成 async/后台保存，应引入串行写入、版本确认或唯一临时文件，防止旧快照覆盖新快照。</li>
+<li><strong>数据契约缺少显式版本。</strong>Rust settings 有 serde 默认兼容，但 theme/blur_mode 是任意字符串，todos 无 schemaVersion/迁移边界。可先加轻量校验和可读错误；不必为当前规模立即换数据库。前后端默认值目前一致，但仍是两处维护。</li>
+</ul>
+<h3>窗口状态与错误可观测性</h3>
+<p><a href="../src-tauri/src/win32_window.rs"><code>src-tauri/src/win32_window.rs:325–339</code></a>、<a href="../src-tauri/src/win32_window.rs"><code>src-tauri/src/win32_window.rs:476–489</code></a> 和 hook/watcher 安装路径丢弃多项 Win32 返回值。部分上层命令因此无条件返回成功，还可能在实际窗口操作前先改状态。建议重要操作返回 <code>Result</code>，成功后提交状态；可选视觉效果允许降级，但需可诊断日志。正常环境发生失败的概率本次未测。</p>
+<p>建议把展开、贴边收起、托盘隐藏与恢复建成一个窗口状态协调入口。不要让 React、RuntimeState 和 HWND 各自提交“成功”；由原生操作结果返回已生效状态，再同步前端。显示器变化、托盘显示和单实例唤起应复用这条路径。</p>
+<details open><summary>DPI 与 Win+D：必须保留的实机验证项</summary>
+<p><code>ScaleFactorChanged</code> 回调总是调用完整尺寸的 resize，没有显式处理收起状态；但锁定的 Tao 在 <code>WM_DPICHANGED</code> 处理中还可能随后应用 Windows 建议矩形。最终结果依赖回调/缓冲顺序，不能直接报告为“必然把小竖条扩大”。核对依据为 <a href="https://raw.githubusercontent.com/tauri-apps/tao/tao-v0.37.2/src/platform_impl/windows/event_loop.rs" rel="noreferrer">Tao 0.37.2 event_loop.rs</a> 和 <a href="https://raw.githubusercontent.com/tauri-apps/tao/tao-v0.37.2/src/platform_impl/windows/event_loop/runner.rs" rel="noreferrer">事件 runner</a>。</p>
+<p><code>GetDpiForMonitor</code> 的返回和调用线程 DPI awareness 有特定约束，当前失败会回退 96 DPI；需以最终 HWND 和 viewport 验证混合缩放。参考 <a href="https://learn.microsoft.com/en-us/windows/win32/api/shellscalingapi/nf-shellscalingapi-getdpiformonitor" rel="noreferrer">微软 GetDpiForMonitor 文档</a>。</p>
+<p>Win+D 依赖 Progman/WorkerW 的前台事件，需覆盖手动隐藏后 Win+D、置顶开关、Explorer 重启与 Windows 10/11。watcher 仅处理 WM_DISPLAYCHANGE；任务栏工作区变动的 <a href="https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-settingchange" rel="noreferrer">WM_SETTINGCHANGE</a> 应另测。GetMessageW 循环可防御性地区分 -1、0、正值；本次未找到正常条件下必然触发 -1 的证据。</p>
+</details>
+<h3>安全边界</h3>
+<div class="callout"><p><strong>当前密码机制应被理解为界面遮挡。</strong><code>todos.json</code> 明文保存，hash 返回前端，后端没有认证会话或解密过程。拥有当前 Windows 账户文件访问能力的人不在该遮罩的有效防护范围内；README 也没有承诺加密。修复 F01 仍然必要，它直接影响已承诺的界面锁定。</p></div>
+<ul>
+<li><a href="../src/utils/password.ts"><code>src/utils/password.ts:1–7</code></a> 使用固定前缀和单次 SHA-256，最短 4 位，无随机个体盐或慢 KDF。如果产品需要抵抗离线猜测，应单独设计加密及密钥生命周期。仅替换哈希算法不会让明文待办获得保密性。</li>
+<li><a href="../src-tauri/tauri.conf.json"><code>src-tauri/tauri.conf.json:29–31</code></a> 的 <code>csp: null</code> 缺少脚本加载约束。当前待办通过 React 文本插值输出，检索未见 <code>dangerouslySetInnerHTML</code>、<code>innerHTML</code>、<code>eval</code> 或业务远端内容入口，因此记录为纵深加固，不能称已确认 XSS/RCE。可以制定兼容 Tauri IPC、本地资源与现有样式的 CSP，再验证打包产物。<a href="https://v2.tauri.app/security/csp/" rel="noreferrer">Tauri CSP 说明</a>。</li>
+<li><code>withGlobalTauri</code> 开启但前端已使用模块导入，可评估关闭不需要的全局暴露。自定义 <code>invoke_handler</code> 命令默认可被应用窗口调用，capability 未列出保存命令不代表它们被拒绝；需要 AppManifest/权限声明显式纳管。当前仅有 main 本地窗口、未配置 remote capability，不能说任意网站都能写本地。<a href="https://v2.tauri.app/security/capabilities/" rel="noreferrer">Tauri 自定义命令与 capability 默认规则</a>。</li>
+<li>设置与待办入口缺少业务容量限制、枚举校验和稳定的迁移错误。其调用参数并非任意文件路径，没有通用 shell/进程执行接口。优先补本地数据校验和最低权限，不应据此推导未经证实的远程利用链。</li>
+</ul>
+<h3 id="D01">D01：干净电脑安装的依赖分发方案与验收尚未落实</h3>
+<div class="callout warning"><p><strong>交付缺口：当前不能把“干净电脑双击安装即可使用”写成已经验证的能力。</strong>项目已开启 Tauri 安装包构建，沿用默认联网引导安装策略；运行时随包的离线策略没有配置，也没有真实安装包及干净系统验收证据。这不代表联网的干净电脑必然无法安装。</p></div>
+<p>用户侧的目标是：一台处于声明支持范围内、没有 Node.js/Rust/MSVC 开发工具、可能没有 WebView2 的 Windows 电脑，用户拿到正式安装包后，由安装器检测并补齐必要运行时，然后能启动和使用应用。是否支持断网安装须单独声明并验证。构建工具只应存在于开发机或构建环境，不应要求普通用户自行搭建。</p>
+<div class="table-wrap"><table><caption>D01 当前事实与尚缺内容</caption><thead><tr><th scope="col">检查点</th><th scope="col">当前证据</th><th scope="col">交付边界</th></tr></thead><tbody>
+<tr><td>安装包构建入口</td><td><a href="../src-tauri/tauri.conf.json"><code>src-tauri/tauri.conf.json:33–41</code></a> 已设置 <code>bundle.active=true</code>、<code>targets=all</code>；README 提供标准构建命令。</td><td>具备框架打包配置基础，不等于已有可交付安装包；本次没有执行构建，工作区也未发现 release/bundle 产物。</td></tr>
+<tr><td>缺失 WebView2 时的联网处理</td><td>未显式配置 <code>bundle.windows.webviewInstallMode</code>。按 Tauri 默认行为，生成的安装包使用 <code>downloadBootstrapper</code>。</td><td>框架安装器可检测并联网补装运行时，无需先在 React 中自行实现；当前项目的实际安装结果、下载失败和权限场景仍未验证。</td></tr>
+<tr><td>离线安装</td><td>配置中没有 <code>offlineInstaller</code> 或固定运行时路径。</td><td>不能承诺安装包已包含 WebView2 或断网干净电脑可安装；需要明确配置、构建和验证。</td></tr>
+<tr><td>独立 EXE</td><td><a href="../README.md"><code>README.md:35–39</code></a> 把 <code>--no-bundle</code> 输出称为“单文件绿色版”。</td><td>独立 EXE 不包含标准安装器的依赖补装流程，不能等同完全免运行时的单文件应用。需要 WebView2 已存在，或另行安排运行时分发与引导。</td></tr>
+<tr><td>启动失败提示</td><td><a href="../src-tauri/src/main.rs"><code>src-tauri/src/main.rs:3–5</code></a> 直接调用 run；<a href="../src-tauri/src/lib.rs"><code>src-tauri/src/lib.rs:521–522</code></a> 以通用 expect 处理最终错误，未见项目自定义缺失运行时的引导。</td><td>不能据此说 Tauri 完全不会提示错误；应先检查安装器/框架现有行为，再按真实缺口补原生层提示。WebView2 未就绪时，React 页面不能承担修复入口。</td></tr>
+</tbody></table></div>
+<p>依据：<a href="https://v2.tauri.app/distribute/windows-installer/#webview2-installation-options" rel="noreferrer">Tauri WebView2 安装策略</a>与<a href="https://v2.tauri.app/reference/config/#webviewinstallmode" rel="noreferrer">配置默认值</a>。Edge 浏览器已安装也不能代替对 WebView2 Runtime 的检测，见<a href="https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution" rel="noreferrer">微软分发说明</a>。</p>
+<h4>建议实施步骤与修改位置，尚未执行</h4>
+<ol>
+<li><strong>明确交付物：</strong>在 <code>src-tauri/tauri.conf.json</code> 明确正式分发的安装包格式，例如 NSIS setup.exe；选定支持的 Windows 版本与 CPU 架构。保留多个格式时分别验收，不能只测试独立 EXE。</li>
+<li><strong>明确运行时策略：</strong>如目标包含断网的干净电脑，设置 <code>bundle.windows.webviewInstallMode.type=offlineInstaller</code>，随安装包附带对应架构的 WebView2 离线安装器；如只承诺联网安装，则显式保留联网策略并说明联网要求。离线包体积会增加，但不要求最终用户准备开发环境。</li>
+<li><strong>修订使用说明：</strong>在 <code>README.md</code> 分开说明开发前置条件、成品运行条件、安装包的使用方式，以及独立 EXE 的运行时限制。明确下载失败、权限不足时应如何重试或退出，避免把建议方案写成已交付功能。</li>
+<li><strong>按需补失败入口：</strong>先验证默认安装器是否足够清晰地处理运行时缺失、下载/安装失败。确有缺口时再扩展安装器提示；若仍分发独立 EXE，可在 <code>src-tauri/src/main.rs / lib.rs</code> 创建 WebView 前补原生提示或引导。无需在 React 中重复实现运行时安装器。</li>
+<li><strong>生成并归档真实产物：</strong>获授权后在具备工具链的 Windows 构建环境生成安装包，记录版本、架构、文件名及校验值；在隔离干净系统执行下表验收，保存结果和失败记录。工具链缺失时先获得安装授权或使用已有 Windows 构建环境。</li>
+</ol>
+<p class="small muted">局部配置示例，仅说明离线 NSIS 方案，未写入项目配置。合并时需保留现有 productName、identifier、active、图标等字段。该示例本身不代表打包成功或已通过安装验收。</p>
+<pre><code>{
+  "bundle": {
+    "targets": ["nsis"],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller"
+      }
+    }
+  }
+}</code></pre>
+<h4>干净电脑验收标准，全部待执行</h4>
+<div class="table-wrap"><table><caption>D01 最小验收矩阵；测试镜像不安装 Node.js、Rust 或 MSVC 开发工具</caption><thead><tr><th scope="col">测试场景</th><th scope="col">预期结果</th><th scope="col">应保留的证据</th></tr></thead><tbody>
+<tr><td>缺少 WebView2，能够联网，使用联网安装包</td><td>安装器检测缺失、取得运行时并完成安装，应用成功启动；用户无需手动查找开发工具或运行时下载地址。</td><td>系统/架构、初始运行时状态、联网条件、安装器结果、首次启动结果。</td></tr>
+<tr><td>缺少 WebView2，断网，使用声明支持离线的安装包</td><td>使用包内运行时安装器完成安装与启动，不能依靠测试机缓存或临时联网掩盖缺失依赖。</td><td>断网条件、包内依赖策略、干净镜像初态、安装及启动记录。</td></tr>
+<tr><td>已有 WebView2，首次安装或升级应用</td><td>合理复用运行时，应用能启动；升级不覆盖待办和密码设置。</td><td>安装前后版本、运行时状态与既有应用数据保留结果。</td></tr>
+<tr><td>下载失败、运行时安装失败或权限不足</td><td>提示清晰，允许合理重试或退出；不得把依赖未就绪显示为安装成功并留下不可启动状态。</td><td>可理解的错误、退出/重试行为、安装日志及是否遗留半成品。</td></tr>
+<tr><td>继续提供独立 EXE</td><td>分别验收运行时已有与缺失情形；已有时正常启动，缺失时按已声明策略提示或引导，不能只验证开发机运行。</td><td>交付物类型、运行时初态、提示/启动行为；README 与实际行为一致。</td></tr>
+<tr><td>Windows 版本、架构与基本生命周期</td><td>在每种声明支持的组合上完成安装、首次启动、待办保存后重启、升级和卸载；可选视觉效果不支持时仍保持基本内容可读、可操作。</td><td>覆盖的系统/架构、各步骤结果、失败项与尚未支持的组合。</td></tr>
+</tbody></table></div>
+<p><strong>D01 的完成条件：</strong>明确交付物和运行时策略，生成真实安装包，并在干净环境按声明范围安装启动成功；失败分支有可理解的处理。只改配置、仅在开发机运行或仅能生成 EXE 都不足以关闭此项。影响范围主要是打包配置、分发说明和交付验证；按需涉及原生启动提示，不要求改写待办业务或数据格式。</p>
+<p class="small muted">D01 单列为交付缺口，不计入既有 16 项源码缺陷。没有把默认联网能力缺少自定义代码误判为完全不支持安装，也没有将上述建议写成已经完成。实际安装、工具链配置、构建和系统变更均未执行。</p>
+<h3>性能与可维护性</h3>
+<p>复制列表的 DOM 数量随条目数约三倍增长，每行有持续流光、阴影、状态和 <code>will-change</code>，再叠加窗口 blur 与倾斜。每次修改又整量序列化并写入 JSON；不透明度滑块每次 onChange 都触发保存。这些是可定位的成本来源，但本次没有运行分析，不能报告具体卡顿、帧率或内存泄漏。</p>
+<p>先以常用条目规模和压力规模测量启动时间、输入响应、主线程占用、文件写入频率和内存，再决定是否需要保存合并/去抖、暂停离屏动画或调整循环实现。不要为尚未测出的瓶颈先引入大型状态库和虚拟化框架。</p>
+<p><code>CompletedSection.tsx</code> 当前未接入，<code>computeStabilizedScrollTop</code> 只在测试出现，<code>is_docked_right</code> 命令也缺少前端使用。它们应在确认设计意图后接入或清理；未启用组件的问题不能当作当前运行缺陷。</p>
+</section>
+
+<section id="verification">
+<h2><span class="section-no">08</span>验证缺口与验收方案</h2>
+<div class="table-wrap"><table><caption>已有测试静态盘点，不代表执行通过</caption><thead><tr><th scope="col">现有位置</th><th scope="col">用例数量与覆盖</th><th scope="col">不能证明的事项</th></tr></thead><tbody>
+<tr><td><code>src/utils/loopScroll.test.ts</code></td><td>4 个 it：启用阈值、顶部/底部包装、大幅跳跃、尺寸变化稳定函数。</td><td>真实 DOM 测量、克隆焦点、组件挂载、编辑和滚动锚定。</td></tr>
+<tr><td><code>src/utils/tilt3d.test.ts</code></td><td>3 个 it：中心、边界/角度上限、越界坐标。</td><td>真实鼠标事件、动画、CSS 合成与减少动作。</td></tr>
+<tr><td><code>src-tauri/src/storage.rs</code></td><td>2 个 #[test]：新目录写一次再读取；不存在设置默认值与一次往返。</td><td>没有第二次覆盖已有文件；不含坏/空 JSON、权限、rename 失败、恢复、IPC、密码和启动门控。</td></tr>
+<tr><td><code>src-tauri/src/win32_window.rs</code></td><td>7 个 #[test]：样式位、右上角、缩放、负坐标、点包含与 peek/restore 几何。</td><td>真实 API 成功、DPI 事件顺序、Win+D、托盘、显示器热插拔与生命周期。</td></tr>
+</tbody></table></div>
+<p>仓库中未见组件/端到端测试或 CI 配置，现有 16 个用例均未执行。没有“测试通过所以可发布”的证据。构建入口只有 <code>tsc &amp;&amp; vite build</code> 和 Tauri 构建脚本，不能替代运行验收。</p>
+<h3>建议先补的行为验收</h3>
+<div class="table-wrap"><table><caption>按风险安排的最小验证矩阵</caption><thead><tr><th scope="col">场景</th><th scope="col">方法</th><th scope="col">通过标准</th></tr></thead><tbody>
+<tr><td>加载门控与恢复</td><td>mock 延迟/失败 IPC；隔离数据目录注入损坏与只读条件。</td><td>非 ready 状态零保存；原文件不被覆盖；重试成功再允许编辑。</td></tr>
+<tr><td>设置密码 → 锁定 → 解锁</td><td>组件集成测试，分别覆盖首次与修改、保存延迟/失败/成功。</td><td>无残留密码；失败不伪装成功；成功密码可重新加载使用。</td></tr>
+<tr><td>保存状态与退出</td><td>todos/settings 交叉失败；同对象重试；连续编辑与延迟保存。</td><td>无关成功不解除失败；最终确认版本确实落盘；失败数据有明确恢复方式。</td></tr>
+<tr><td>草稿、IME、撤销</td><td>输入多行、中文组合输入、失焦收起/展开、锁定、连续删除撤销。</td><td>草稿按明确策略保留；组合输入不误提交；撤销恢复正确对象与位置。</td></tr>
+<tr><td>窗口状态</td><td>展开/收起/托盘隐藏下的显示器移除、单实例唤起、API 失败注入。</td><td>React 状态、Rust 状态、HWND 矩形和实际可见性一致。</td></tr>
+<tr><td>Windows 10/11 与 DPI</td><td>100%、150%、175%；跨屏拖动、原地改缩放、负坐标、底部、任务栏工作区。</td><td>无不可触达窗口、异常透明区域、裁切；收起恢复几何一致。记录最终矩形与 viewport。</td></tr>
+<tr><td>Win+D、托盘、自启动</td><td>置顶开关、重复 Win+D、Explorer 重启、Run 项真值与重启行为。</td><td>手动隐藏保持隐藏，显示操作可恢复；自启动 UI 和系统真值一致。</td></tr>
+<tr><td>键盘与减少动作</td><td>循环列表逐项 Tab、读屏、reduced-motion 计算样式。</td><td>每条一套可访问操作；焦点可见；隐藏副本无活跃焦点；动态效果遵从偏好。</td></tr>
+<tr><td>界面语义与状态消息</td><td>检查表单可访问树；只用键盘展开收起条；读屏接收保存/密码错误与删除结果。</td><td>控件名称/选中值明确，展开操作可达，消息及时且不重复播报；参见 F14–F16。</td></tr>
+<tr><td>文字、目标与受限布局</td><td>逐状态计算按钮对比度；浅/深主题与壁纸极值取样；高 DPI 密码错误/确认表单；实际命中盒检查。</td><td>普通按钮文字达到4.5:1；关键内容可达；焦点持续可辨；小目标与间距按实际布局评估。参见 F13 与第五章算例。</td></tr>
+<tr><td>动效时序与成本</td><td>reduce 在启动/运行中切换；检查倾斜回正、hover边缘、局部撒花、收起逐帧；常用/压力规模性能记录。</td><td>reduce 后无遗留姿态和装饰运动；交互/内容反馈可靠；用测量决定长期动画策略，不预设FPS通过线。</td></tr>
+<tr><td>打包产物</td><td>干净 Windows 环境验证便携 exe 和安装包，检查 WebView2、数据目录、升级与卸载。</td><td>产物能启动、真实读写与源行为一致；无意外数据覆盖；签名和分发策略明确。</td></tr>
+<tr><td>缺失运行环境</td><td>隔离 Windows 环境覆盖缺少/已有/过旧 WebView2、联网/断网、普通用户权限，以及声明支持的 CPU 架构；分别验收安装包与便携目录。</td><td>缺失时补装或给清晰可操作提示；离线包不因下载运行时而失败；权限不足不伪装安装成功；不要求成品用户安装 Node/Rust。可选视觉效果降级后基本待办功能可用。上述场景均未执行。</td></tr>
+</tbody></table></div>
+<h3>后续命令，仅作为执行方案</h3>
+<p class="small muted">以下命令没有运行。安装、项目测试和构建可能产生文件或改变环境，须获得用户明确授权。注册表与真实用户数据场景应使用替身或隔离环境。</p>
+<pre><code># 在已选定且满足依赖要求的 Node / Rust / MSVC 环境中
+npm ci
+npm test
+npm run build
+cargo test --locked --manifest-path src-tauri/Cargo.toml
+cargo check --locked --manifest-path src-tauri/Cargo.toml
+npm run tauri build -- --no-bundle
+
+# 标准安装包另行验证
+npm run tauri build</code></pre>
+<p>编译和单元测试通过后，仍需执行上表的组件、故障注入和原生场景。以后若新增 CI，优先 Windows runner，固定 Node/Rust 版本并使用两份锁文件；依赖漏洞检查应覆盖 npm 与 Cargo，结果与检查日期一起归档。</p>
+</section>
+
+<section id="roadmap">
+<h2><span class="section-no">09</span>建议实施顺序与影响范围</h2>
+<p>以下为可实施方案，尚未执行。先修明确缺陷和失败路径，再以测试保护小步拆分。每一步均说明修改位置、范围及验收依据。</p>
+<div class="phase"><h3>第一批：阻止锁定失效与原数据覆盖</h3><p>修改 <code>src/App.tsx</code> 的启动门控和保存入口、<code>LockOverlay.tsx</code> 的模式生命周期，并为密码提交建立真正等待保存的路径，处理 F01–F03。必要时让 <code>lib.rs / storage.rs</code> 返回可区分的加载结果。</p><p><strong>影响范围：</strong>启动、重试、全部编辑入口、设置/修改密码及锁定。初期不改变 JSON 结构。<strong>验收：</strong>加载前/失败后不写盘，坏设置不覆盖正常待办；锁屏没有残留密码；保存失败可见且不宣布成功。</p></div>
+<div class="phase"><h3>第二批：建立保存确认、草稿与系统设置的一致性</h3><p>在 <code>App.tsx</code> 或独立状态 hook 中分开保存状态和错误；提升新增草稿；把 updater 内副作用移到提交层，处理 F04–F06、F10。自启动由 Rust 单入口协调实际系统状态与配置。</p><p><strong>影响范围：</strong>待办提交、主题/不透明度保存、撤销、草稿、置顶和自启动。<strong>验收：</strong>交叉失败不消除未恢复告警；草稿跨收起保留；一次动作对应明确提交；注册表和 UI 真值一致。</p></div>
+<div class="phase"><h3>第三批：统一原生窗口恢复与可访问交互</h3><p>在 <code>lib.rs</code> 把托盘显示、显示变化和贴边恢复汇入一个协调入口；<code>win32_window.rs</code> 的关键操作返回结果。修复列表克隆焦点与无效模糊选项，补 reduced-motion，处理 F07–F09、F11；在 <code>tokens.css</code>、设置/锁屏/撤销组件与收起分支处理 F13–F16。动效默认强度和受限布局按第五章先验后改。</p><p><strong>影响范围：</strong>跨屏、DPI、托盘、自动隐藏、循环列表、文字色彩、表单语义与消息。<strong>验收：</strong>先有可注入的状态转换测试，再在 Windows 10/11 执行拓扑/DPI/Win+D 矩阵；键盘和读屏不进入隐藏克隆，控件有名称，状态可感知，普通按钮文字达到参考对比度。视觉和性能需实际记录。</p></div>
+<div class="phase"><h3>第四批：完成干净电脑安装交付，再做有边界的拆分</h3><p>先按 <a href="#D01">D01</a> 明确安装包与 WebView2 分发方式，修改 <code>src-tauri/tauri.conf.json</code> 和 <code>README.md</code>；获授权后生成真实安装包，在无开发工具的干净 Windows 环境完成联网安装及依赖缺失、权限、升级卸载验收；声明支持离线时，另完成断网干净系统验收。统一 <code>package.json</code> 与说明中的工具链要求，再补 Windows CI、打包冒烟和依赖检查。随后按职责拆分 <code>App.tsx</code>：可考虑 <code>useTodos</code>、<code>useSettings</code>、<code>useWindowController</code>；Rust 分离命令与窗口协调。名字只是建议，不是本次已创建文件。</p><p><strong>影响范围：</strong>打包配置、运行时分发、使用说明与交付验证；按需涉及原生错误提示，后续才进行模块整理。<strong>验收：</strong>D01 完成条件满足后才宣称干净电脑可安装；安装器与独立 EXE 的限制表述准确，已有数据在升级后保留。每次拆分后已有行为用例通过，性能改动以测量为依据。</p></div>
+<p>近期完成标准应是“核心失败路径可靠且可验证”，而非新增更多视觉效果。若需要把密码升级为真正的数据保密功能，应另开明确需求，先决定威胁模型、密钥存放、恢复方式与加密数据迁移，再实施。</p>
+</section>
+
+<section id="appendix">
+<h2><span class="section-no">10</span>覆盖清单与参考资料</h2>
+<div class="table-wrap"><table><caption>已审查范围和深度</caption><thead><tr><th scope="col">范围</th><th scope="col">文件</th><th scope="col">审查深度</th></tr></thead><tbody><tr><td>前端入口与总控</td><td><code>src/main.tsx · src/App.tsx</code></td><td>完整静态阅读；状态、持久化、锁定、贴边、事件与渲染分支</td></tr>
+<tr><td>界面组件</td><td><code>src/components/TitleBar.tsx · TodoInput.tsx · TodoItemRow.tsx · InfiniteTodoList.tsx · LockOverlay.tsx · SettingsPanel.tsx · UndoToast.tsx · ConfettiBurst.tsx · CompletedSection.tsx</code></td><td>9 个组件完整阅读；CompletedSection 当前没有接入 App</td></tr>
+<tr><td>类型、主题与样式</td><td><code>src/types/todo.ts · src/hooks/useTheme.ts · src/styles/global.css · src/styles/tokens.css</code></td><td>前后端结构、默认值、主题订阅、选择器与 reduced-motion</td></tr>
+<tr><td>前端工具和测试</td><td><code>src/utils/loopScroll.ts · loopScroll.test.ts · tilt3d.ts · tilt3d.test.ts · password.ts</code></td><td>全部阅读；7 个 it，未执行</td></tr>
+<tr><td>Rust 启动与命令</td><td><code>src-tauri/src/main.rs · src-tauri/src/lib.rs · src-tauri/build.rs</code></td><td>入口、12 个 IPC command、setup、托盘、单实例与窗口事件</td></tr>
+<tr><td>Rust 存储与原生适配</td><td><code>src-tauri/src/storage.rs · src-tauri/src/win32_window.rs</code></td><td>全部阅读，含 9 个内嵌 Rust 测试，未执行</td></tr>
+<tr><td>依赖与配置</td><td><code>package.json · package-lock.json · src-tauri/Cargo.toml · src-tauri/Cargo.lock · tsconfig.json · vite.config.ts · src-tauri/tauri.conf.json · src-tauri/capabilities/default.json</code></td><td>直接依赖与锁定版本、引擎约束、构建入口、权限与 CSP；未做完整依赖漏洞扫描</td></tr>
+<tr><td>项目说明与静态资源</td><td><code>README.md · .gitignore · index.html · src-tauri/icons/32x32.png · 128x128.png · icon.ico</code></td><td>文本阅读、资源引用与文件清单检查；未验证图标视觉、安装包与签名</td></tr></tbody></table></div>
+<h3>锁定依赖摘录</h3>
+<p class="small">以下来自当前锁文件，不是已安装版本或“最新版本”声明。</p>
+<div class="table-wrap"><table><thead><tr><th scope="col">前端 / 构建</th><th scope="col">锁定版本</th><th scope="col">Rust / 原生</th><th scope="col">锁定版本</th></tr></thead><tbody>
+<tr><td>React / React DOM</td><td>19.3.1</td><td>tauri</td><td>2.12.5</td></tr>
+<tr><td>@tauri-apps/api / cli</td><td>2.12.4</td><td>tauri-runtime-wry</td><td>2.12.3</td></tr>
+<tr><td>Vite / Vitest</td><td>6.4.6 / 3.2.7</td><td>tauri-plugin-single-instance</td><td>2.5.5</td></tr>
+<tr><td>TypeScript</td><td>5.9.3</td><td>windows（项目直接依赖）</td><td>0.58.0</td></tr>
+<tr><td>Tailwind / @tailwindcss/vite / oxide</td><td>4.3.5</td><td>wry / winreg（项目直接依赖）</td><td>0.57.2 / 0.52.0</td></tr>
+</tbody></table></div>
+<h3>已排除或未坐实的误报</h3>
+<ul>
+<li>没有证据证明 Windows 上 <code>fs::rename</code> 一定不能替换已有目标文件；也没有把固定临时文件单独认定为当前可达的并发写漏洞。</li>
+<li>没有因为 <code>_tray</code> 是局部变量就判定托盘会在 setup 结束销毁；锁定版 Tauri 会注册并保留托盘资源。</li>
+<li>windows 0.58 的 subclass API 位置和 HMODULE → HINSTANCE 参数转换有官方源码支持；两个 windows crate 版本共存本身不构成编译错误。</li>
+<li>未把主机 PATH 缺少 Rust 当成项目源码错误，未把尚未执行的构建/测试描述成失败。</li>
+<li>CSP 为空、明文待办和固定前缀 hash 说明边界及硬化机会，但没有据此捏造远程 XSS、任意网站 IPC 或数据加密已被攻破。</li>
+</ul>
+<h3>官方资料与实现依据</h3>
+<p class="small">界面专项另外核对 W3C 的 <a href="https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html" rel="noreferrer">文字对比度</a>、<a href="https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html" rel="noreferrer">目标尺寸与例外</a>、<a href="https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html" rel="noreferrer">焦点可见</a>、<a href="https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html" rel="noreferrer">名称/角色/值</a>、<a href="https://www.w3.org/WAI/WCAG22/Understanding/status-messages.html" rel="noreferrer">状态消息</a>和<a href="https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html" rel="noreferrer">键盘操作</a>。这些是 WebView 内容的审查参考，未出具整个 Windows 应用的合规认证。</p>
+<ol class="small">
+<li><a href="https://react.dev/learn/preserving-and-resetting-state" rel="noreferrer">React：Preserving and Resetting State</a>，用于 F01 与组件卸载状态判断。</li>
+<li><a href="https://react.dev/reference/react/StrictMode" rel="noreferrer">React：StrictMode</a>，用于 F10 的开发环境纯函数重复调用边界。</li>
+<li><a href="https://v2.tauri.app/develop/calling-rust/" rel="noreferrer">Tauri：Calling Rust from the Frontend</a>，同步 command 及 IPC 执行模型。</li>
+<li><a href="https://v2.tauri.app/security/capabilities/" rel="noreferrer">Tauri：Capabilities</a>；<a href="https://v2.tauri.app/security/csp/" rel="noreferrer">Content Security Policy</a>，用于权限默认规则和纵深防御。</li>
+<li><a href="https://www.w3.org/WAI/standards-guidelines/act/rules/6cfa84/" rel="noreferrer">W3C ACT：aria-hidden 区域的顺序聚焦规则</a>，用于 F09。</li>
+<li><a href="https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwineventhook" rel="noreferrer">Microsoft：SetWinEventHook</a>；<a href="https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getmessagew" rel="noreferrer">GetMessageW</a>，用于消息循环边界。</li>
+<li><a href="https://raw.githubusercontent.com/tauri-apps/tauri/tauri-v2.12.5/crates/tauri/src/tray/mod.rs" rel="noreferrer">Tauri 2.12.5 托盘源码</a>；<a href="https://raw.githubusercontent.com/microsoft/windows-rs/0.58.0/crates/libs/windows/src/Windows/Win32/UI/Shell/mod.rs" rel="noreferrer">windows-rs 0.58 Shell</a>；<a href="https://raw.githubusercontent.com/microsoft/windows-rs/0.58.0/crates/libs/windows/src/Windows/Win32/Foundation/mod.rs" rel="noreferrer">Foundation 类型转换</a>，用于排除生命周期和绑定位置误报。</li>
+</ol>
+<p class="small muted">外部链接是公开官方文档或对应版本源码。结论首先以当前仓库为依据；网站后续变化不自动改变本次已记录基线。本文不包含用户的本地待办、密码或凭据。</p>
+</section>
+<footer>DeskSticky · 静态源码审查 · 基线 830e16b1bcb6d58ce7fffbe1326519b285211461 · 2026-11-13<br>本次交付仅为审查文档。代码修复、项目测试、安装与系统变更均未执行。</footer>
+</main>
+</div>
+</body>
+</html>
